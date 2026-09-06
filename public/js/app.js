@@ -915,18 +915,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Calcular estadísticas actuales de la biblioteca
-    let booksCount = 0;
+    let booksCount = allBooksList.length;
     let chaptersCount = 0;
-    let sectionsCount = libraryData.length;
+    let sectionsCount = Array.isArray(libraryTree) ? libraryTree.length : 0;
 
-    libraryData.forEach(sec => {
-      (sec.subsections || []).forEach(sub => {
-        (sub.books || []).forEach(b => {
-          booksCount++;
-          chaptersCount += (b.total_chapters || 0);
-        });
-      });
+    allBooksList.forEach(b => {
+      chaptersCount += (b.total_chapters || 0);
     });
+
 
     if (backupStatBooks) backupStatBooks.textContent = String(booksCount);
     if (backupStatChapters) backupStatChapters.textContent = String(chaptersCount);
