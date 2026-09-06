@@ -37,6 +37,27 @@ test('Las portadas usan una proporción cuadrada', () => {
   assert.doesNotMatch(coverWrap.join('\n'), /aspect-ratio:\s*2\s*\/\s*3/);
 });
 
+test('La cabecera standalone no superpone el safe area superior', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'public/index.html'), 'utf8');
+  const styles = fs.readFileSync(path.join(__dirname, '..', 'public/css/styles.css'), 'utf8');
+
+  assert.match(html, /viewport-fit=cover/);
+  assert.match(html, /apple-mobile-web-app-status-bar-style" content="black-translucent"/);
+  assert.doesNotMatch(html, /apple-mobile-web-app-status-bar-style" content="default"/);
+  const appTopbar = styles.match(/\.app-topbar\s*\{[^}]*\}/)?.[0] || '';
+  const readerView = styles.match(/\.reader-view\s*\{[^}]*\}/)?.[0] || '';
+  const readerTopbar = styles.match(/\.reader-topbar\s*\{[^}]*\}/)?.[0] || '';
+
+  assert.match(appTopbar, /height:\s*var\(--topbar-total-height\)/);
+  assert.match(appTopbar, /top:\s*0/);
+  assert.match(appTopbar, /padding:\s*var\(--safe-area-inset-top\)/);
+  assert.doesNotMatch(appTopbar, /margin-top:/);
+  assert.match(readerView, /top:\s*0/);
+  assert.match(readerTopbar, /height:\s*var\(--topbar-total-height\)/);
+  assert.match(readerTopbar, /padding:\s*var\(--safe-area-inset-top\)/);
+  assert.match(styles, /--safe-area-inset-top:\s*constant\(safe-area-inset-top\);/);
+});
+
 test('Capa de Base de Datos (SQLite3)', async (t) => {
   await t.test('Crea y recupera secciones y subsecciones', () => {
     const sec = getOrCreateSection('Tecnología');
