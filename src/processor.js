@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const AdmZip = require('adm-zip');
 const { slugify, findBookByCode, createBookTransaction, replaceBookTransaction } = require('./db');
+const { normalizeSemVer, compareSemVer, diffSemVer } = require('./semver');
 
 const BASE_LIBRARY_PATH = process.env.LIBRARY_PATH ||
   (process.env.VERCEL ? path.join('/tmp', 'library') : path.join(__dirname, '..', 'library'));
@@ -466,10 +467,26 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
     metadata.code = metadata.code.trim().toUpperCase();
   }
 
-  // Versión
-  if (!metadata.version) {
-    metadata.version = meta.version || '1.0.0';
+  // Versión SemVer
+  metadata.version = normalizeSemVer(metadata.version || meta.version || '1.0.0');
+
+  // Changelog
+  let changelogText = '';
+  if (metadata.changelog) {
+    if (Array.isArray(metadata.changelog)) {
+      changelogText = metadata.changelog.map(item => typeof item === 'string' ? `• ${item}` : `• ${JSON.stringify(item)}`).join('\n');
+    } else {
+      changelogText = String(metadata.changelog).trim();
+    }
+  } else if (meta.changelog) {
+    changelogText = String(meta.changelog).trim();
   }
+  metadata.changelog = changelogText;
+
+  // Estado de ciclo de vida ('draft' | 'published' | 'archived')
+  const allowedStates = ['draft', 'published', 'archived'];
+  const rawState = String(metadata.state || meta.state || 'published').toLowerCase().trim();
+  metadata.state = allowedStates.includes(rawState) ? rawState : 'published';
 
   // Fecha de publicación / edición
   const rawDate = metadata.date || metadata.publication_date || meta.date || meta.publication_date;
@@ -495,16 +512,23 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
     metadata.subsection = 'General';
   }
 
-  // 4. Verificación de colisión por Código y Fecha/Versión
+  // 4. Verificación de colisión por Código y Fecha/Versión (SemVer 2.0.0)
   const existingBook = findBookByCode(metadata.code);
   let isReplacement = false;
 
   if (existingBook) {
+    const semverComp = compareSemVer(metadata.version, existingBook.version);
     const incomingTime = new Date(metadata.publication_date).getTime();
     const existingTime = new Date(existingBook.publication_date).getTime();
 
-    // Si la fecha entrante es inferior o igual a la existente: avisar que ya está instalada una versión superior
-    if (incomingTime <= existingTime) {
+    // Actualización válida si SemVer es mayor, o si es igual y la fecha es superior, o si ambos son draft
+    const isNewerSemver = semverComp > 0;
+    const isSameSemverNewerDate = semverComp === 0 && incomingTime > existingTime;
+    const isDraftUpdate = existingBook.state === 'draft' && metadata.state === 'draft';
+
+    if (isNewerSemver || isSameSemverNewerDate || isDraftUpdate) {
+      isReplacement = true;
+    } else {
       const err = new Error(
         `Ya está instalada una versión superior o igual del libro "${existingBook.title}" (Código: ${existingBook.code}, Versión instalada: v${existingBook.version}, Fecha: ${existingBook.publication_date}). La versión que intentas importar tiene fecha ${metadata.publication_date} (v${metadata.version}).`
       );
@@ -512,9 +536,6 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
       err.existingBook = existingBook;
       throw err;
     }
-
-    // Si la fecha entrante es superior: se sustituye
-    isReplacement = true;
   }
 
   // 5. Validar exhaustivamente el contenido del ZIP ANTES de tocar nada en disco o DB
@@ -580,7 +601,7 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
   //    Si algo falla aquí, el libro existente no se toca en absoluto.
   const sectionSlug = slugify(metadata.section);
   const subsectionSlug = slugify(metadata.subsection);
-  const bookFolderSlug = slugify(metadata.title) + '-' + Date.now().toString(36);
+  const bookFolderSlug = slugify(metadata.title) + '-v' + slugify(metadata.version) + '-' + Date.now().toString(36);
   const stagingDir = safeResolvePath(path.join(sectionSlug, subsectionSlug, bookFolderSlug + '-staging'), BASE_LIBRARY_PATH);
   const finalDir   = safeResolvePath(path.join(sectionSlug, subsectionSlug, bookFolderSlug), BASE_LIBRARY_PATH);
 
@@ -638,6 +659,8 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
       title: metadata.title,
       author: metadata.author,
       version: metadata.version,
+      state: metadata.state,
+      changelog: metadata.changelog,
       date: metadata.publication_date,
       publication_date: metadata.publication_date,
       description: metadata.description,
@@ -672,6 +695,8 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
     title: metadata.title,
     author: metadata.author,
     version: metadata.version,
+    state: metadata.state,
+    changelog: metadata.changelog,
     publication_date: metadata.publication_date,
     description: metadata.description,
     section: metadata.section,
@@ -703,19 +728,18 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
       fs.cpSync(stagingDir, finalDir, { recursive: true });
       fs.rmSync(stagingDir, { recursive: true, force: true });
     } catch (copyErr) {
-      // En último caso dejar staging como directorio válido actualizando el storage_path en DB
-      // (la DB ya apunta a finalDir, pero staging existe; próxima lectura fallará)
       console.warn('Advertencia: no se pudo renombrar staging a directorio final:', renameErr.message);
     }
   }
 
-  // 10. Eliminar el directorio anterior del libro (ahora que todo es correcto)
-  if (isReplacement && existingBook.storage_path && existingBook.storage_path !== finalDir) {
+  // 10. Limpieza: si la versión anterior era un borrador ('draft'), eliminar el directorio del borrador obsoleto.
+  // Las versiones publicadas ('published' o 'archived') se conservan de forma inmutable para histórico y comparaciones.
+  if (isReplacement && existingBook.state === 'draft' && existingBook.storage_path && existingBook.storage_path !== finalDir) {
     if (fs.existsSync(existingBook.storage_path)) {
       try {
         fs.rmSync(existingBook.storage_path, { recursive: true, force: true });
       } catch (e) {
-        console.warn('Advertencia al limpiar directorio anterior:', e.message);
+        console.warn('Advertencia al limpiar borrador anterior:', e.message);
       }
     }
   }

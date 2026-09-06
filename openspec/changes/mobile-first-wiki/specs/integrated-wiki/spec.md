@@ -27,9 +27,10 @@ The server MUST expose a read-only `GET /api/wiki` endpoint that reads `WIKI_COM
 The client MUST provide the Guide & Wiki as a primary top-level view (`#wiki-view`) alongside Publicaciones and Versiones under the main application view (`#library-view`). When selected via subtab navigation (`#tab-btn-wiki`) or route `#wiki`:
 1. The topbar title MUST replace "Biblioteca" with "Guía" and subtitle "Documentación & Formato".
 2. The subtab button MUST be marked active and the back button (`#btn-back-to-grid`) MUST be displayed to allow easy return to the library grid.
-3. The client MUST render internal subtabs (`Guía Rápida`, `Plantilla metadata.json`, `Documentación Completa`, `Versión & GitHub`).
+3. The client MUST render internal subtabs (`Guía Rápida`, `Plantilla metadata.json`, `Documentación Completa`, `Cómo crear libros`, `Versión & GitHub`) in that order.
 4. In `Documentación Completa`, the client MUST load Wiki content from `/api/wiki` and render safe Markdown into the view container.
-5. Returning to Publicaciones or pressing Escape MUST restore the topbar title to "Biblioteca" and display the category grid.
+5. The `Cómo crear libros` pane MUST explain Markdown writing tools, organizing chapters, cover, and `metadata.json`, previewing/exporting, and compressing only after preparation. External tool links MUST use `target="_blank" rel="noopener noreferrer"`.
+6. Returning to Publicaciones or pressing Escape MUST restore the topbar title to "Biblioteca" and display the category grid.
 
 #### Scenario: Open and navigate Wiki as primary view
 
@@ -37,6 +38,7 @@ The client MUST provide the Guide & Wiki as a primary top-level view (`#wiki-vie
 - WHEN the user clicks "GUÍA & WIKI" in the subnav or navigates to `#wiki`
 - THEN the topbar title switches to "Guía", the back button appears, and the `#wiki-view` is revealed with internal tabs
 - AND clicking any internal tab chip toggles the respective guide pane smoothly
+- AND the "Cómo crear libros" pane presents the recommended writing, organization, preview/export, and compression flow with safe external links
 - AND clicking the back button or "PUBLICACIONES" restores the title to "Biblioteca" and shows the library categories.
 
 #### Scenario: Wiki fallback

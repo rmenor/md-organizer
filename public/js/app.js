@@ -121,6 +121,38 @@ document.addEventListener('DOMContentLoaded', () => {
   const integrityModalAlert = document.getElementById('integrity-modal-alert');
   let currentIntegrityBookId = null;
 
+  // Modal Historial de Versiones y Changelog
+  const versionsModal = document.getElementById('versions-modal');
+  const btnCloseVersionsModal = document.getElementById('btn-close-versions-modal');
+  const btnCloseVersionsBtn = document.getElementById('btn-close-versions-btn');
+  const versionsBookTitle = document.getElementById('versions-book-title');
+  const versionsBookMeta = document.getElementById('versions-book-meta');
+  const bookStateSelector = document.getElementById('book-state-selector');
+  const versionsTimelineList = document.getElementById('versions-timeline-list');
+  const btnOpenCompareFromVersions = document.getElementById('btn-open-compare-from-versions');
+  const versionsModalAlert = document.getElementById('versions-modal-alert');
+  let currentVersionsBookId = null;
+
+  // Modal Comparación entre Versiones (Diff)
+  const compareModal = document.getElementById('compare-modal');
+  const btnCloseCompareModal = document.getElementById('btn-close-compare-modal');
+  const btnCloseCompareBtn = document.getElementById('btn-close-compare-btn');
+  const compareVersionA = document.getElementById('compare-version-a');
+  const compareVersionB = document.getElementById('compare-version-b');
+  const btnExecuteCompare = document.getElementById('btn-execute-compare');
+  const compareSemverBadge = document.getElementById('compare-semver-badge');
+  const compareChaptersBreakdown = document.getElementById('compare-chapters-breakdown');
+  const compareWordsDelta = document.getElementById('compare-words-delta');
+  const compareAssetsBreakdown = document.getElementById('compare-assets-breakdown');
+  const compareChaptersTbody = document.getElementById('compare-chapters-tbody');
+  const compareAssetsTbody = document.getElementById('compare-assets-tbody');
+  const compareDiffViewer = document.getElementById('compare-diff-viewer');
+  const diffViewerTitle = document.getElementById('diff-viewer-title');
+  const btnCloseDiff = document.getElementById('btn-close-diff');
+  const diffLinesContainer = document.getElementById('diff-lines-container');
+  const compareModalAlert = document.getElementById('compare-modal-alert');
+  let currentCompareBookId = null;
+
 
 
   // Utilidad para sanitizar texto HTML
@@ -491,22 +523,47 @@ document.addEventListener('DOMContentLoaded', () => {
     allBooksList.forEach(book => {
       const item = document.createElement('div');
       item.className = 'updates-card-item';
+
+      let stateBadge = '<span class="state-pill published">🟢 Publicado</span>';
+      if (book.state === 'draft') {
+        stateBadge = '<span class="state-pill draft">🟡 Borrador</span>';
+      } else if (book.state === 'archived') {
+        stateBadge = '<span class="state-pill archived">⚪ Archivado</span>';
+      }
+
       item.innerHTML = `
         <div class="update-book-info">
           <h4>${escapeHtml(book.title)}</h4>
           <div class="update-book-meta">
             <span>Código: <strong>${escapeHtml(book.code)}</strong></span> ·
             <span>Versión: <strong>v${escapeHtml(book.version)}</strong></span> ·
-            <span>Fecha: <strong>${escapeHtml(book.publication_date ? book.publication_date.substring(0, 10) : 'N/A')}</strong></span>
+            <span>Fecha: <strong>${escapeHtml(book.publication_date ? book.publication_date.substring(0, 10) : 'N/A')}</strong></span> ·
+            ${stateBadge}
           </div>
+          ${book.changelog ? `<div style="font-size:0.78rem; color:var(--app-text-muted); margin-top:0.35rem; white-space:pre-line;">${escapeHtml(book.changelog.length > 140 ? book.changelog.substring(0, 140) + '...' : book.changelog)}</div>` : ''}
         </div>
-        <div style="display:flex; align-items:center; gap:0.6rem;">
+        <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+          <button class="btn-sm-action btn-open-versions" data-book-id="${escapeHtml(book.id)}" title="Ver historial de versiones y notas de versión">
+            📜 Historial & Changelog
+          </button>
+          <button class="btn-sm-action btn-open-compare" data-book-id="${escapeHtml(book.id)}" title="Comparar dos versiones de este libro">
+            ⚖️ Comparar
+          </button>
           <button class="badge-integrity" data-book-id="${escapeHtml(book.id)}" title="Verificar integridad criptográfica SHA-256">
             🛡️ SHA-256
           </button>
-          <div class="update-status-pill">✓ Instalado</div>
         </div>
       `;
+
+      item.querySelector('.btn-open-versions')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openVersionsModal(book.id);
+      });
+
+      item.querySelector('.btn-open-compare')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openCompareModal(book.id);
+      });
 
       item.querySelector('.badge-integrity')?.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1264,6 +1321,386 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.openIntegrityModal = openIntegrityModal;
 
+  // ==========================================
+  // MODAL DE HISTORIAL DE VERSIONES Y CHANGELOG
+  // ==========================================
+  async function openVersionsModal(bookId) {
+    if (!versionsModal) return;
+    currentVersionsBookId = bookId;
+    versionsModal.classList.remove('hidden');
+    if (versionsModalAlert) versionsModalAlert.classList.add('hidden');
+    if (versionsTimelineList) {
+      versionsTimelineList.innerHTML = '<p style="text-align:center; padding:1.5rem; color:var(--app-text-muted);">Cargando historial de versiones...</p>';
+    }
+
+    const book = allBooksList.find(b => b.id === bookId);
+    if (book) {
+      if (versionsBookTitle) versionsBookTitle.textContent = book.title;
+      if (versionsBookMeta) versionsBookMeta.textContent = `Código: ${book.code} • Versión Activa: v${book.version}`;
+      if (bookStateSelector) bookStateSelector.value = book.state || 'published';
+    }
+
+    await loadVersionsHistory(bookId);
+  }
+
+  function closeVersionsModal() {
+    if (!versionsModal) return;
+    versionsModal.classList.add('hidden');
+    currentVersionsBookId = null;
+  }
+
+  async function loadVersionsHistory(bookId) {
+    try {
+      const res = await fetch(`/api/books/${bookId}/versions`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudo cargar el historial de versiones.');
+
+      const versions = data.versions || [];
+      const book = allBooksList.find(b => b.id === bookId);
+
+      if (versionsTimelineList) {
+        if (versions.length === 0) {
+          versionsTimelineList.innerHTML = '<p style="text-align:center; padding:1rem; color:var(--app-text-muted);">No hay versiones archivadas para este libro.</p>';
+          return;
+        }
+
+        versionsTimelineList.innerHTML = versions.map(v => {
+          const isActive = book && book.version === v.version;
+          let statePill = '<span class="state-pill published">Publicado</span>';
+          if (v.state === 'draft') statePill = '<span class="state-pill draft">Borrador</span>';
+          else if (v.state === 'archived') statePill = '<span class="state-pill archived">Archivado</span>';
+
+          const dateStr = v.publication_date ? v.publication_date.substring(0, 10) : 'N/A';
+          const shortHash = v.checksum ? (v.checksum.substring(0, 8) + '...' + v.checksum.substring(v.checksum.length - 6)) : 'N/A';
+
+          return `
+            <div class="timeline-version-card ${isActive ? 'is-active' : ''}">
+              <div class="timeline-version-card-header">
+                <div class="version-badge-group">
+                  <span class="version-semver-pill">v${escapeHtml(v.version)}</span>
+                  ${statePill}
+                  ${isActive ? '<span style="font-size:0.75rem; font-weight:700; color:var(--app-purple-accent);">★ Versión Principal</span>' : ''}
+                </div>
+                <span class="version-date-label">📅 ${escapeHtml(dateStr)} • ${v.total_chapters || 0} capítulos</span>
+              </div>
+
+              ${v.changelog ? `
+                <div class="version-changelog-card">
+                  <strong>Notas de Versión / Changelog:</strong>
+                  <div style="margin-top:0.25rem; white-space:pre-line;">${escapeHtml(v.changelog)}</div>
+                </div>
+              ` : ''}
+
+              <div class="version-card-footer">
+                <span class="version-checksum-label" title="${escapeHtml(v.checksum || '')}">SHA-256: ${escapeHtml(shortHash)}</span>
+                <div class="version-actions-wrap">
+                  ${!isActive ? `<button class="btn-sm-action btn-activate-ver" data-ver-id="${escapeHtml(v.id)}" title="Activar esta versión como principal">Activar</button>` : ''}
+                  <button class="btn-sm-action btn-compare-ver" data-ver-version="${escapeHtml(v.version)}" title="Comparar esta versión">Comparar</button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        // Listeners en botones de versiones
+        versionsTimelineList.querySelectorAll('.btn-activate-ver').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            const verId = btn.getAttribute('data-ver-id');
+            await handleActivateVersion(bookId, verId);
+          });
+        });
+
+        versionsTimelineList.querySelectorAll('.btn-compare-ver').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const ver = btn.getAttribute('data-ver-version');
+            closeVersionsModal();
+            openCompareModal(bookId, null, ver);
+          });
+        });
+      }
+    } catch (err) {
+      if (versionsModalAlert) {
+        versionsModalAlert.textContent = err.message;
+        versionsModalAlert.className = 'alert-message error';
+        versionsModalAlert.classList.remove('hidden');
+      }
+    }
+  }
+
+  async function handleActivateVersion(bookId, versionId) {
+    try {
+      const res = await fetch(`/api/books/${bookId}/activate-version/${versionId}`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudo activar la versión.');
+
+      await loadLibrary();
+      await openVersionsModal(bookId);
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  }
+
+  bookStateSelector?.addEventListener('change', async () => {
+    if (!currentVersionsBookId) return;
+    try {
+      const newState = bookStateSelector.value;
+      const res = await fetch(`/api/books/${currentVersionsBookId}/state`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: newState })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudo actualizar el estado.');
+
+      await loadLibrary();
+      await loadVersionsHistory(currentVersionsBookId);
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  });
+
+  btnOpenCompareFromVersions?.addEventListener('click', () => {
+    if (currentVersionsBookId) {
+      const bId = currentVersionsBookId;
+      closeVersionsModal();
+      openCompareModal(bId);
+    }
+  });
+
+  btnCloseVersionsModal?.addEventListener('click', closeVersionsModal);
+  btnCloseVersionsBtn?.addEventListener('click', closeVersionsModal);
+  if (versionsModal) {
+    versionsModal.addEventListener('click', (e) => {
+      if (e.target === versionsModal) closeVersionsModal();
+    });
+  }
+
+  // ==========================================
+  // MODAL DE COMPARACIÓN ENTRE VERSIONES (DIFF)
+  // ==========================================
+  async function openCompareModal(bookId, defaultFrom = null, defaultTo = null) {
+    if (!compareModal) return;
+    currentCompareBookId = bookId;
+    compareModal.classList.remove('hidden');
+    if (compareModalAlert) compareModalAlert.classList.add('hidden');
+    if (compareDiffViewer) compareDiffViewer.classList.add('hidden');
+
+    try {
+      const res = await fetch(`/api/books/${bookId}/versions`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudieron obtener las versiones del libro.');
+
+      const versions = data.versions || [];
+      if (versions.length < 2) {
+        if (compareModalAlert) {
+          compareModalAlert.textContent = 'Este libro solo tiene 1 versión registrada. Sube una nueva versión para poder compararlas.';
+          compareModalAlert.className = 'alert-message info';
+          compareModalAlert.classList.remove('hidden');
+        }
+      }
+
+      // Rellenar dropdowns
+      if (compareVersionA && compareVersionB) {
+        compareVersionA.innerHTML = versions.map((v) => `<option value="${escapeHtml(v.version)}">v${escapeHtml(v.version)} (${escapeHtml(v.publication_date ? v.publication_date.substring(0, 10) : '')})</option>`).join('');
+        compareVersionB.innerHTML = versions.map((v) => `<option value="${escapeHtml(v.version)}">v${escapeHtml(v.version)} (${escapeHtml(v.publication_date ? v.publication_date.substring(0, 10) : '')})</option>`).join('');
+
+        if (defaultFrom && versions.some(v => v.version === defaultFrom)) {
+          compareVersionA.value = defaultFrom;
+        } else if (versions.length >= 2) {
+          compareVersionA.value = versions[1].version;
+        }
+
+        if (defaultTo && versions.some(v => v.version === defaultTo)) {
+          compareVersionB.value = defaultTo;
+        } else if (versions.length >= 1) {
+          compareVersionB.value = versions[0].version;
+        }
+      }
+
+      await executeComparison(bookId);
+    } catch (err) {
+      if (compareModalAlert) {
+        compareModalAlert.textContent = err.message;
+        compareModalAlert.className = 'alert-message error';
+        compareModalAlert.classList.remove('hidden');
+      }
+    }
+  }
+
+  function closeCompareModal() {
+    if (!compareModal) return;
+    compareModal.classList.add('hidden');
+    currentCompareBookId = null;
+  }
+
+  async function executeComparison(bookId) {
+    if (!compareVersionA || !compareVersionB) return;
+    const fromVer = compareVersionA.value;
+    const toVer = compareVersionB.value;
+
+    if (!fromVer || !toVer) return;
+
+    try {
+      const res = await fetch(`/api/books/${bookId}/compare?from=${encodeURIComponent(fromVer)}&to=${encodeURIComponent(toVer)}`);
+      const report = await res.json();
+      if (!res.ok) throw new Error(report.error || 'Error al ejecutar la comparación.');
+
+      renderCompareReport(report);
+    } catch (err) {
+      if (compareModalAlert) {
+        compareModalAlert.textContent = err.message;
+        compareModalAlert.className = 'alert-message error';
+        compareModalAlert.classList.remove('hidden');
+      }
+    }
+  }
+
+  function renderCompareReport(report) {
+    const { comparison, chapters, assets } = report;
+
+    // 1. Badge SemVer
+    if (compareSemverBadge) {
+      const jump = comparison.semverJump || 'equal';
+      compareSemverBadge.className = `metric-value semver-badge ${jump}`;
+      compareSemverBadge.textContent = jump.toUpperCase();
+    }
+
+    // 2. Desglose Capítulos
+    if (compareChaptersBreakdown) {
+      const cSum = comparison.summary.chapters;
+      compareChaptersBreakdown.innerHTML = `
+        <span style="color:#22c55e;">+${cSum.added}</span> / 
+        <span style="color:#ef4444;">-${cSum.removed}</span> / 
+        <span style="color:#f59e0b;">~${cSum.modified}</span> / 
+        <span style="color:#94a3b8;">=${cSum.unchanged}</span>
+      `;
+    }
+
+    // 3. Diferencial de palabras
+    if (compareWordsDelta) {
+      const delta = comparison.summary.words.netDelta;
+      const sign = delta > 0 ? '+' : '';
+      compareWordsDelta.textContent = `${sign}${delta} palabras`;
+      compareWordsDelta.style.color = delta > 0 ? '#22c55e' : (delta < 0 ? '#ef4444' : 'var(--app-text-main)');
+    }
+
+    // 4. Desglose Assets
+    if (compareAssetsBreakdown) {
+      const aSum = comparison.summary.assets;
+      compareAssetsBreakdown.innerHTML = `
+        <span style="color:#22c55e;">+${aSum.added}</span> / 
+        <span style="color:#ef4444;">-${aSum.removed}</span> / 
+        <span style="color:#f59e0b;">~${aSum.modified}</span>
+      `;
+    }
+
+    // 5. Tabla de Capítulos
+    if (compareChaptersTbody) {
+      if (!chapters || chapters.length === 0) {
+        compareChaptersTbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:1rem; color:var(--app-text-muted);">No hay capítulos para comparar.</td></tr>';
+      } else {
+        compareChaptersTbody.innerHTML = chapters.map((ch, idx) => {
+          let pill = '';
+          if (ch.status === 'added') pill = '<span class="diff-status-pill added" title="Capítulo añadido en la nueva versión">+</span>';
+          else if (ch.status === 'removed') pill = '<span class="diff-status-pill removed" title="Capítulo eliminado en la nueva versión">-</span>';
+          else if (ch.status === 'modified') pill = '<span class="diff-status-pill modified" title="Contenido modificado">~</span>';
+          else pill = '<span class="diff-status-pill unchanged" title="Sin cambios">=</span>';
+
+          const wordDeltaStr = ch.wordDelta !== 0 ? ` (${ch.wordDelta > 0 ? '+' : ''}${ch.wordDelta})` : '';
+          const shortHash = ch.checksumB ? `${ch.checksumB.substring(0, 8)}...` : (ch.checksumA ? `${ch.checksumA.substring(0, 8)}...` : 'N/A');
+
+          const hasDiff = ch.status === 'modified' && ch.diff && ch.diff.length > 0;
+
+          return `
+            <tr>
+              <td>${pill}</td>
+              <td><strong>Cap. ${escapeHtml(ch.chapter_number || ch.order_index)}</strong>: ${escapeHtml(ch.title || '')}</td>
+              <td>${ch.wordsB || ch.wordsA || 0}${wordDeltaStr}</td>
+              <td class="mono" style="font-size:0.75rem;">${escapeHtml(shortHash)}</td>
+              <td>
+                ${hasDiff ? `<button class="btn-sm-action btn-view-chapter-diff" data-ch-index="${idx}">Ver Diff</button>` : '<span style="color:var(--app-text-muted); font-size:0.75rem;">--</span>'}
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        compareChaptersTbody.querySelectorAll('.btn-view-chapter-diff').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const chIndex = parseInt(btn.getAttribute('data-ch-index'), 10);
+            const ch = chapters[chIndex];
+            if (ch && ch.diff) {
+              showLineDiffViewer(`Diferencias: ${ch.title}`, ch.diff);
+            }
+          });
+        });
+      }
+    }
+
+    // 6. Tabla de Assets
+    if (compareAssetsTbody) {
+      if (!assets || assets.length === 0) {
+        compareAssetsTbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:1rem; color:var(--app-text-muted);">No hay recursos ni imágenes adjuntos.</td></tr>';
+      } else {
+        compareAssetsTbody.innerHTML = assets.map(a => {
+          let pill = '';
+          if (a.status === 'added') pill = '<span class="diff-status-pill added">+</span>';
+          else if (a.status === 'removed') pill = '<span class="diff-status-pill removed">-</span>';
+          else if (a.status === 'modified') pill = '<span class="diff-status-pill modified">~</span>';
+          else pill = '<span class="diff-status-pill unchanged">=</span>';
+
+          const sizeStr = `${Math.round((a.sizeB || a.sizeA || 0) / 1024)} KB`;
+          const shortHash = a.checksumB ? `${a.checksumB.substring(0, 8)}...` : (a.checksumA ? `${a.checksumA.substring(0, 8)}...` : 'N/A');
+
+          return `
+            <tr>
+              <td>${pill}</td>
+              <td class="mono">${escapeHtml(a.relativePath || a.filename)}</td>
+              <td>${sizeStr}</td>
+              <td class="mono" style="font-size:0.75rem;">${escapeHtml(shortHash)}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+  }
+
+  function showLineDiffViewer(title, diffLines) {
+    if (!compareDiffViewer || !diffLinesContainer) return;
+    if (diffViewerTitle) diffViewerTitle.textContent = title;
+
+    diffLinesContainer.innerHTML = diffLines.map(line => {
+      let lineClass = 'diff-unchanged';
+      if (line.type === 'added') lineClass = 'diff-added';
+      else if (line.type === 'removed') lineClass = 'diff-removed';
+
+      return `<div class="diff-line ${lineClass}">${escapeHtml(line.text)}</div>`;
+    }).join('');
+
+    compareDiffViewer.classList.remove('hidden');
+    compareDiffViewer.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  btnCloseDiff?.addEventListener('click', () => {
+    if (compareDiffViewer) compareDiffViewer.classList.add('hidden');
+  });
+
+  btnExecuteCompare?.addEventListener('click', () => {
+    if (currentCompareBookId) {
+      executeComparison(currentCompareBookId);
+    }
+  });
+
+  btnCloseCompareModal?.addEventListener('click', closeCompareModal);
+  btnCloseCompareBtn?.addEventListener('click', closeCompareModal);
+  if (compareModal) {
+    compareModal.addEventListener('click', (e) => {
+      if (e.target === compareModal) closeCompareModal();
+    });
+  }
+
+  window.openVersionsModal = openVersionsModal;
+  window.openCompareModal = openCompareModal;
+
   function checkHash() {
     const h = window.location.hash;
     if (h === '#books') {
@@ -1284,6 +1721,10 @@ document.addEventListener('DOMContentLoaded', () => {
         closeBackupModal();
       } else if (integrityModal && !integrityModal.classList.contains('hidden')) {
         closeIntegrityModal();
+      } else if (versionsModal && !versionsModal.classList.contains('hidden')) {
+        closeVersionsModal();
+      } else if (compareModal && !compareModal.classList.contains('hidden')) {
+        closeCompareModal();
       } else if (uploadModal && !uploadModal.classList.contains('hidden')) {
         closeUploadModal();
       } else if (wikiView && !wikiView.classList.contains('hidden')) {

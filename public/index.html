@@ -192,6 +192,7 @@
         <button class="wiki-tab-chip active" data-wiki-tab="guide">Guía Rápida</button>
         <button class="wiki-tab-chip" data-wiki-tab="template">Plantilla metadata.json</button>
         <button class="wiki-tab-chip" data-wiki-tab="full">Documentación Completa</button>
+        <button class="wiki-tab-chip" data-wiki-tab="create">Cómo crear libros</button>
         <button class="wiki-tab-chip" data-wiki-tab="version">Versión &amp; GitHub</button>
       </div>
 
@@ -268,7 +269,52 @@
           </div>
         </div>
 
-        <!-- Pestaña 4: Versión & Descarga GitHub -->
+        <!-- Pestaña 4: Cómo crear libros -->
+        <div class="wiki-pane hidden" id="pane-create">
+          <div class="wiki-card-step">
+            <div class="step-badge">1</div>
+            <div>
+              <h4>Escribe y previsualiza en Markdown</h4>
+              <p>Redacta cada capítulo como un archivo <code>.md</code> y revisa el resultado antes de empaquetarlo. Estas herramientas pueden ayudarte:</p>
+              <ul>
+                <li><a href="https://stackedit.io/" target="_blank" rel="noopener noreferrer"><strong>StackEdit</strong></a>: editor Markdown en el navegador con vista previa.</li>
+                <li><a href="https://dillinger.io/" target="_blank" rel="noopener noreferrer"><strong>Dillinger</strong></a>: editor online para escribir, previsualizar y exportar documentos.</li>
+                <li><a href="https://obsidian.md/" target="_blank" rel="noopener noreferrer"><strong>Obsidian</strong></a>: editor local para organizar capítulos y notas en una carpeta Markdown.</li>
+                <li><a href="https://typora.io/" target="_blank" rel="noopener noreferrer"><strong>Typora</strong></a>: editor de escritorio con previsualización mientras escribes.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="wiki-card-step">
+            <div class="step-badge">2</div>
+            <div>
+              <h4>Organiza el libro antes de comprimirlo</h4>
+              <p>Reúne la portada, los capítulos y los metadatos en una carpeta con una estructura clara:</p>
+              <pre class="code-box">mi-libro/
+├── metadata.json
+├── portada.png
+├── 01_introduccion.md
+├── 02_capitulo.md
+└── assets/</pre>
+              <p>Usa nombres ordenados para los capítulos y completa <code>metadata.json</code> con el título, autor, código, versión y fecha.</p>
+            </div>
+          </div>
+
+          <div class="wiki-card-step">
+            <div class="step-badge">3</div>
+            <div>
+              <h4>Previsualiza, exporta y comprime al final</h4>
+              <ol>
+                <li>Previsualiza todos los capítulos y comprueba enlaces, imágenes y encabezados.</li>
+                <li>Exporta o guarda el contenido Markdown junto con la portada y <code>metadata.json</code>.</li>
+                <li>Comprime el <strong>contenido</strong> de la carpeta, no la carpeta contenedora, para que <code>metadata.json</code> quede en la raíz del ZIP.</li>
+              </ol>
+              <div class="rule-box"><strong>Flujo recomendado:</strong> escribir en Markdown → organizar capítulos, portada y <code>metadata.json</code> → previsualizar/exportar → comprimir.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pestaña 5: Versión & Descarga GitHub -->
         <div class="wiki-pane hidden" id="pane-version">
           <div class="version-release-hero">
             <div class="version-hero-info">
@@ -727,11 +773,159 @@ npm start</pre>
     </div>
   </div>
 
+  <!-- MODAL DE HISTORIAL DE VERSIONES Y CHANGELOG -->
+  <div class="modal-backdrop hidden" id="versions-modal" role="dialog" aria-modal="true" aria-labelledby="versions-modal-title">
+    <div class="modal-box versions-modal-box">
+      <div class="modal-header">
+        <div>
+          <h3 id="versions-modal-title">Historial de Versiones y Changelog</h3>
+          <span class="wiki-subtitle" id="versions-modal-subtitle">Versiones inmutables y notas de publicación</span>
+        </div>
+        <button class="btn-close-modal" id="btn-close-versions-modal" aria-label="Cerrar">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="versions-header-card">
+          <div class="versions-header-info">
+            <h4 id="versions-book-title">Título del Libro</h4>
+            <span class="versions-meta-line" id="versions-book-meta">Código: BK-01 • Versión Activa: v1.0.0</span>
+          </div>
+          <div class="versions-state-control">
+            <label for="book-state-selector" class="state-label">Estado:</label>
+            <select id="book-state-selector" class="state-select">
+              <option value="published">🟢 Publicado</option>
+              <option value="draft">🟡 Borrador</option>
+              <option value="archived">⚪ Archivado</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="versions-timeline-wrap">
+          <h5 class="versions-section-title">Línea Temporal de Versiones</h5>
+          <div class="versions-timeline-list" id="versions-timeline-list">
+            <!-- Rellenado dinámicamente con versiones y changelogs -->
+          </div>
+        </div>
+
+        <div class="alert-message hidden" id="versions-modal-alert"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btn-open-compare-from-versions">⚖️ Comparar Versiones</button>
+        <button class="btn-primary" id="btn-close-versions-btn">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE COMPARACIÓN ENTRE VERSIONES (DIFF) -->
+  <div class="modal-backdrop hidden" id="compare-modal" role="dialog" aria-modal="true" aria-labelledby="compare-modal-title">
+    <div class="modal-box compare-modal-box">
+      <div class="modal-header">
+        <div>
+          <h3 id="compare-modal-title">Comparación entre Versiones</h3>
+          <span class="wiki-subtitle" id="compare-modal-subtitle">Auditoría visual de capítulos, contenidos y recursos</span>
+        </div>
+        <button class="btn-close-modal" id="btn-close-compare-modal" aria-label="Cerrar">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Selector de Versiones A vs B -->
+        <div class="compare-selector-bar">
+          <div class="compare-select-col">
+            <label for="compare-version-a">Versión Base (Origen):</label>
+            <select id="compare-version-a" class="compare-dropdown"></select>
+          </div>
+          <div class="compare-vs-badge">VS</div>
+          <div class="compare-select-col">
+            <label for="compare-version-b">Versión Nueva (Destino):</label>
+            <select id="compare-version-b" class="compare-dropdown"></select>
+          </div>
+          <button class="btn-primary" id="btn-execute-compare">Comparar</button>
+        </div>
+
+        <!-- Panel de Métricas y Resumen de Cambios -->
+        <div class="compare-summary-grid" id="compare-summary-grid">
+          <div class="summary-metric-card">
+            <span class="metric-label">Salto SemVer</span>
+            <span class="metric-value semver-badge" id="compare-semver-badge">--</span>
+          </div>
+          <div class="summary-metric-card">
+            <span class="metric-label">Capítulos</span>
+            <div class="metric-breakdown" id="compare-chapters-breakdown">--</div>
+          </div>
+          <div class="summary-metric-card">
+            <span class="metric-label">Diferencial Palabras</span>
+            <span class="metric-value" id="compare-words-delta">--</span>
+          </div>
+          <div class="summary-metric-card">
+            <span class="metric-label">Recursos / Assets</span>
+            <div class="metric-breakdown" id="compare-assets-breakdown">--</div>
+          </div>
+        </div>
+
+        <!-- Tabla de Comparación de Capítulos -->
+        <div class="compare-section">
+          <h5 class="compare-section-title">Desglose de Capítulos</h5>
+          <div class="compare-table-wrap">
+            <table class="compare-table">
+              <thead>
+                <tr>
+                  <th style="width: 45px;">Estado</th>
+                  <th>Capítulo</th>
+                  <th>Palabras</th>
+                  <th>Huella SHA-256</th>
+                  <th style="width: 100px;">Acción</th>
+                </tr>
+              </thead>
+              <tbody id="compare-chapters-tbody">
+                <!-- Rellenado dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Visor de Diferencias Textuales Línea por Línea (Modal/Drawer secundario desplegable) -->
+        <div class="compare-diff-viewer hidden" id="compare-diff-viewer">
+          <div class="diff-viewer-header">
+            <h6 id="diff-viewer-title">Diferencias en capítulo</h6>
+            <button class="btn-close-diff" id="btn-close-diff" title="Cerrar visor de diferencias">✕</button>
+          </div>
+          <div class="diff-lines-container" id="diff-lines-container"></div>
+        </div>
+
+        <!-- Desglose de Recursos / Assets -->
+        <div class="compare-section" id="compare-assets-section">
+          <h5 class="compare-section-title">Recursos e Imágenes (Assets)</h5>
+          <div class="compare-table-wrap">
+            <table class="compare-table">
+              <thead>
+                <tr>
+                  <th style="width: 45px;">Estado</th>
+                  <th>Archivo</th>
+                  <th>Tamaño</th>
+                  <th>Hash SHA-256</th>
+                </tr>
+              </thead>
+              <tbody id="compare-assets-tbody">
+                <!-- Rellenado dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="alert-message hidden" id="compare-modal-alert"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-primary" id="btn-close-compare-btn">Aceptar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- SCRIPTS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="/js/reader.js?v=11"></script>
-  <script src="/js/app.js?v=20"></script>
+  <script src="/js/app.js?v=21"></script>
 </body>
 </html>
-

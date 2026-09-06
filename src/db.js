@@ -2,6 +2,7 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { compareSemVer } = require('./semver');
 
 
 const DB_PATH = process.env.DB_PATH || (process.env.VERCEL ? path.join('/tmp', 'library.db') : path.join(__dirname, '..', 'library.db'));
@@ -20,16 +21,30 @@ db.pragma('foreign_keys = ON');
 
 let insertBookStmt;
 let insertChapterStmt;
+let insertVersionStmt;
 
 function prepareStatements() {
   insertBookStmt = db.prepare(`
-    INSERT INTO books (subsection_id, code, title, slug, version, publication_date, author, description, cover_image, storage_path, total_chapters, checksum)
-    VALUES (@subsection_id, @code, @title, @slug, @version, @publication_date, @author, @description, @cover_image, @storage_path, @total_chapters, @checksum)
+    INSERT INTO books (subsection_id, code, title, slug, version, publication_date, author, description, cover_image, storage_path, total_chapters, checksum, state, changelog)
+    VALUES (@subsection_id, @code, @title, @slug, @version, @publication_date, @author, @description, @cover_image, @storage_path, @total_chapters, @checksum, @state, @changelog)
   `);
 
   insertChapterStmt = db.prepare(`
     INSERT INTO chapters (book_id, title, order_index, file_name, relative_path, word_count, checksum)
     VALUES (@book_id, @title, @order_index, @file_name, @relative_path, @word_count, @checksum)
+  `);
+
+  insertVersionStmt = db.prepare(`
+    INSERT INTO book_versions (book_id, code, version, publication_date, state, changelog, checksum, storage_path, total_chapters, chapters_manifest)
+    VALUES (@book_id, @code, @version, @publication_date, @state, @changelog, @checksum, @storage_path, @total_chapters, @chapters_manifest)
+    ON CONFLICT(code, version) DO UPDATE SET
+      publication_date = excluded.publication_date,
+      state = excluded.state,
+      changelog = excluded.changelog,
+      checksum = excluded.checksum,
+      storage_path = excluded.storage_path,
+      total_chapters = excluded.total_chapters,
+      chapters_manifest = excluded.chapters_manifest
   `);
 }
 
@@ -66,6 +81,8 @@ function initDb() {
       storage_path TEXT NOT NULL,
       total_chapters INTEGER DEFAULT 0,
       checksum TEXT NOT NULL DEFAULT '',
+      state TEXT NOT NULL DEFAULT 'published',
+      changelog TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -82,10 +99,28 @@ function initDb() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS book_versions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+      code TEXT NOT NULL,
+      version TEXT NOT NULL,
+      publication_date TEXT NOT NULL,
+      state TEXT NOT NULL DEFAULT 'published',
+      changelog TEXT DEFAULT '',
+      checksum TEXT NOT NULL DEFAULT '',
+      storage_path TEXT NOT NULL,
+      total_chapters INTEGER DEFAULT 0,
+      chapters_manifest TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(code, version)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_subsections_section ON subsections(section_id);
     CREATE INDEX IF NOT EXISTS idx_books_subsection ON books(subsection_id);
     CREATE INDEX IF NOT EXISTS idx_books_code ON books(code);
     CREATE INDEX IF NOT EXISTS idx_chapters_book ON chapters(book_id);
+    CREATE INDEX IF NOT EXISTS idx_book_versions_book ON book_versions(book_id);
+    CREATE INDEX IF NOT EXISTS idx_book_versions_code ON book_versions(code);
   `);
 
   // Migración segura para bases de datos existentes
@@ -102,11 +137,27 @@ function initDb() {
   if (!columns.includes('checksum')) {
     db.exec("ALTER TABLE books ADD COLUMN checksum TEXT NOT NULL DEFAULT ''");
   }
+  if (!columns.includes('state')) {
+    db.exec("ALTER TABLE books ADD COLUMN state TEXT NOT NULL DEFAULT 'published'");
+  }
+  if (!columns.includes('changelog')) {
+    db.exec("ALTER TABLE books ADD COLUMN changelog TEXT DEFAULT ''");
+  }
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_code ON books(code)");
 
   const chapterCols = db.prepare("PRAGMA table_info(chapters)").all().map(c => c.name);
   if (!chapterCols.includes('checksum')) {
     db.exec("ALTER TABLE chapters ADD COLUMN checksum TEXT NOT NULL DEFAULT ''");
+  }
+
+  const verCols = db.prepare("PRAGMA table_info(book_versions)").all().map(c => c.name);
+  if (verCols.length > 0) {
+    if (!verCols.includes('state')) {
+      db.exec("ALTER TABLE book_versions ADD COLUMN state TEXT NOT NULL DEFAULT 'published'");
+    }
+    if (!verCols.includes('changelog')) {
+      db.exec("ALTER TABLE book_versions ADD COLUMN changelog TEXT DEFAULT ''");
+    }
   }
 }
 
@@ -214,20 +265,27 @@ function createBookTransaction(bookData, chaptersData) {
     const subsection = getOrCreateSubsection(section.id, bookData.subsection);
 
     const bookSlug = slugify(bookData.title) + '-' + Date.now().toString(36);
+    const bookCode = bookData.code || ('BK-' + slugify(bookData.title).toUpperCase());
+    const bookVersion = bookData.version || '1.0.0';
+    const pubDate = bookData.publication_date || new Date().toISOString().split('T')[0];
+    const state = bookData.state || 'published';
+    const changelog = bookData.changelog || '';
 
     const bookResult = insertBookStmt.run({
       subsection_id: subsection.id,
-      code: bookData.code || ('BK-' + slugify(bookData.title).toUpperCase()),
+      code: bookCode,
       title: bookData.title,
       slug: bookSlug,
-      version: bookData.version || '1.0.0',
-      publication_date: bookData.publication_date || new Date().toISOString().split('T')[0],
+      version: bookVersion,
+      publication_date: pubDate,
       author: bookData.author || 'Desconocido',
       description: bookData.description || '',
       cover_image: bookData.cover_image || '',
       storage_path: bookData.storage_path,
       total_chapters: chaptersData.length,
-      checksum: bookData.checksum || ''
+      checksum: bookData.checksum || '',
+      state,
+      changelog
     });
 
     const bookId = bookResult.lastInsertRowid;
@@ -244,6 +302,27 @@ function createBookTransaction(bookData, chaptersData) {
       });
     }
 
+    // Registrar versión inmutable en book_versions
+    insertVersionStmt.run({
+      book_id: bookId,
+      code: bookCode,
+      version: bookVersion,
+      publication_date: pubDate,
+      state,
+      changelog,
+      checksum: bookData.checksum || '',
+      storage_path: bookData.storage_path,
+      total_chapters: chaptersData.length,
+      chapters_manifest: JSON.stringify(chaptersData.map(c => ({
+        title: c.title,
+        order_index: c.order_index,
+        file_name: c.file_name,
+        relative_path: c.relative_path,
+        word_count: c.word_count || 0,
+        checksum: c.checksum || ''
+      })))
+    });
+
     return bookId;
   });
 
@@ -256,6 +335,17 @@ function replaceBookTransaction(existingBookId, bookData, chaptersData) {
     const subsection = getOrCreateSubsection(section.id, bookData.subsection);
 
     const bookSlug = slugify(bookData.title) + '-' + Date.now().toString(36);
+    const bookCode = bookData.code;
+    const bookVersion = bookData.version || '1.0.0';
+    const pubDate = bookData.publication_date || new Date().toISOString().split('T')[0];
+    const state = bookData.state || 'published';
+    const changelog = bookData.changelog || '';
+
+    // Si la versión anterior estaba como published, marcarla como archived en book_versions
+    const existing = db.prepare('SELECT * FROM books WHERE id = ?').get(existingBookId);
+    if (existing) {
+      db.prepare("UPDATE book_versions SET state = 'archived' WHERE book_id = ? AND state = 'published' AND version != ?").run(existingBookId, bookVersion);
+    }
 
     // Actualizar libro existente
     db.prepare(`
@@ -272,22 +362,26 @@ function replaceBookTransaction(existingBookId, bookData, chaptersData) {
           storage_path = @storage_path,
           total_chapters = @total_chapters,
           checksum = @checksum,
+          state = @state,
+          changelog = @changelog,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = @id
     `).run({
       id: existingBookId,
       subsection_id: subsection.id,
-      code: bookData.code,
+      code: bookCode,
       title: bookData.title,
       slug: bookSlug,
-      version: bookData.version || '1.0.0',
-      publication_date: bookData.publication_date || new Date().toISOString().split('T')[0],
+      version: bookVersion,
+      publication_date: pubDate,
       author: bookData.author || 'Desconocido',
       description: bookData.description || '',
       cover_image: bookData.cover_image || '',
       storage_path: bookData.storage_path,
       total_chapters: chaptersData.length,
-      checksum: bookData.checksum || ''
+      checksum: bookData.checksum || '',
+      state,
+      changelog
     });
 
     // Eliminar capítulos antiguos
@@ -305,6 +399,27 @@ function replaceBookTransaction(existingBookId, bookData, chaptersData) {
         checksum: ch.checksum || ''
       });
     }
+
+    // Registrar nueva versión inmutable en book_versions
+    insertVersionStmt.run({
+      book_id: existingBookId,
+      code: bookCode,
+      version: bookVersion,
+      publication_date: pubDate,
+      state,
+      changelog,
+      checksum: bookData.checksum || '',
+      storage_path: bookData.storage_path,
+      total_chapters: chaptersData.length,
+      chapters_manifest: JSON.stringify(chaptersData.map(c => ({
+        title: c.title,
+        order_index: c.order_index,
+        file_name: c.file_name,
+        relative_path: c.relative_path,
+        word_count: c.word_count || 0,
+        checksum: c.checksum || ''
+      })))
+    });
 
     // Limpiar secciones o subsecciones huérfanas
     db.prepare(`
@@ -550,6 +665,200 @@ function verifyLibraryIntegrity() {
   };
 }
 
+/**
+ * Obtiene el historial completo de versiones de un libro (por ID o código), ordenado por SemVer descendente.
+ * @param {number|string} bookIdOrCode
+ * @returns {Array<object>}
+ */
+function getBookVersions(bookIdOrCode) {
+  let rows;
+  if (typeof bookIdOrCode === 'number' || /^\d+$/.test(String(bookIdOrCode))) {
+    const book = db.prepare('SELECT code FROM books WHERE id = ?').get(bookIdOrCode);
+    const code = book ? book.code : '';
+    rows = db.prepare(`
+      SELECT bv.*, b.title as current_book_title
+      FROM book_versions bv
+      LEFT JOIN books b ON bv.book_id = b.id
+      WHERE bv.book_id = ? OR (bv.code != '' AND bv.code = ?)
+      ORDER BY bv.id DESC
+    `).all(bookIdOrCode, code);
+  } else {
+    rows = db.prepare(`
+      SELECT bv.*, b.title as current_book_title
+      FROM book_versions bv
+      LEFT JOIN books b ON bv.book_id = b.id
+      WHERE bv.code = ?
+      ORDER BY bv.id DESC
+    `).all(String(bookIdOrCode));
+  }
+
+  // Parsear chapters_manifest de cada versión y ordenar por SemVer
+  const parsed = rows.map(r => {
+    let chapters = [];
+    if (r.chapters_manifest) {
+      try { chapters = JSON.parse(r.chapters_manifest); } catch (_) {}
+    }
+    return { ...r, chapters };
+  });
+
+  parsed.sort((a, b) => compareSemVer(b.version, a.version));
+  return parsed;
+}
+
+/**
+ * Obtiene una versión específica por su ID en book_versions.
+ * @param {number} versionId
+ * @returns {object|null}
+ */
+function getVersionById(versionId) {
+  const row = db.prepare(`
+    SELECT bv.*, b.title as current_book_title
+    FROM book_versions bv
+    LEFT JOIN books b ON bv.book_id = b.id
+    WHERE bv.id = ?
+  `).get(versionId);
+
+  if (!row) return null;
+
+  let chapters = [];
+  if (row.chapters_manifest) {
+    try { chapters = JSON.parse(row.chapters_manifest); } catch (_) {}
+  }
+  return { ...row, chapters };
+}
+
+/**
+ * Busca una versión por su código de libro y cadena de versión SemVer.
+ * @param {string} code
+ * @param {string} version
+ * @returns {object|null}
+ */
+function findVersionByCodeAndVersion(code, version) {
+  const row = db.prepare(`
+    SELECT bv.*, b.title as current_book_title
+    FROM book_versions bv
+    LEFT JOIN books b ON bv.book_id = b.id
+    WHERE bv.code = ? AND bv.version = ?
+  `).get(code, version);
+
+  if (!row) return null;
+
+  let chapters = [];
+  if (row.chapters_manifest) {
+    try { chapters = JSON.parse(row.chapters_manifest); } catch (_) {}
+  }
+  return { ...row, chapters };
+}
+
+/**
+ * Actualiza el estado de ciclo de vida de un libro ('draft' | 'published' | 'archived').
+ * @param {number} bookId
+ * @param {'draft'|'published'|'archived'} state
+ */
+function updateBookState(bookId, state) {
+  const allowed = ['draft', 'published', 'archived'];
+  if (!allowed.includes(state)) {
+    throw new Error(`Estado no válido: "${state}". Permitidos: ${allowed.join(', ')}`);
+  }
+  const book = db.prepare('SELECT * FROM books WHERE id = ?').get(bookId);
+  if (!book) throw new Error('Libro no encontrado');
+
+  db.prepare('UPDATE books SET state = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(state, bookId);
+  db.prepare('UPDATE book_versions SET state = ? WHERE book_id = ? AND version = ?').run(state, bookId, book.version);
+
+  return { success: true, bookId, state };
+}
+
+/**
+ * Actualiza el estado de ciclo de vida de una versión específica.
+ * @param {number} versionId
+ * @param {'draft'|'published'|'archived'} state
+ */
+function updateVersionState(versionId, state) {
+  const allowed = ['draft', 'published', 'archived'];
+  if (!allowed.includes(state)) {
+    throw new Error(`Estado no válido: "${state}". Permitidos: ${allowed.join(', ')}`);
+  }
+  const ver = db.prepare('SELECT * FROM book_versions WHERE id = ?').get(versionId);
+  if (!ver) throw new Error('Versión no encontrada');
+
+  db.prepare('UPDATE book_versions SET state = ? WHERE id = ?').run(state, versionId);
+
+  // Si esta versión coincide con la versión activa del libro principal, sincronizar
+  const book = db.prepare('SELECT * FROM books WHERE id = ?').get(ver.book_id);
+  if (book && book.version === ver.version) {
+    db.prepare('UPDATE books SET state = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(state, book.id);
+  }
+
+  return { success: true, versionId, state };
+}
+
+/**
+ * Activa una versión previa como la versión principal del libro.
+ * @param {number} bookId
+ * @param {number} versionId
+ */
+function activateBookVersion(bookId, versionId) {
+  const version = getVersionById(versionId);
+  if (!version) throw new Error('Versión no encontrada');
+  const book = db.prepare('SELECT * FROM books WHERE id = ?').get(bookId);
+  if (!book) throw new Error('Libro no encontrado');
+
+  const tx = db.transaction(() => {
+    // 1. Archivar versión actual si estaba publicada
+    db.prepare("UPDATE book_versions SET state = 'archived' WHERE book_id = ? AND version = ? AND state = 'published'").run(bookId, book.version);
+
+    // 2. Marcar versión seleccionada como publicada
+    db.prepare("UPDATE book_versions SET state = 'published' WHERE id = ?").run(versionId);
+
+    // 3. Actualizar libro principal
+    db.prepare(`
+      UPDATE books
+      SET version = @version,
+          publication_date = @publication_date,
+          state = 'published',
+          changelog = @changelog,
+          checksum = @checksum,
+          storage_path = @storage_path,
+          total_chapters = @total_chapters,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = @id
+    `).run({
+      id: bookId,
+      version: version.version,
+      publication_date: version.publication_date,
+      changelog: version.changelog || '',
+      checksum: version.checksum,
+      storage_path: version.storage_path,
+      total_chapters: version.total_chapters
+    });
+
+    // 4. Reemplazar capítulos activos en la tabla chapters
+    db.prepare('DELETE FROM chapters WHERE book_id = ?').run(bookId);
+
+    const chapters = version.chapters || [];
+    for (const ch of chapters) {
+      insertChapterStmt.run({
+        book_id: bookId,
+        title: ch.title,
+        order_index: ch.order_index,
+        file_name: ch.file_name,
+        relative_path: ch.relative_path,
+        word_count: ch.word_count || 0,
+        checksum: ch.checksum || ''
+      });
+    }
+  });
+
+  tx();
+  const updatedBook = getBookById(bookId);
+  return {
+    success: true,
+    activated_version: version.version,
+    ...updatedBook
+  };
+}
+
 module.exports = {
   db,
   DB_PATH,
@@ -570,7 +879,13 @@ module.exports = {
   remapStoragePaths,
   getDatabaseStats,
   verifyBookIntegrity,
-  verifyLibraryIntegrity
+  verifyLibraryIntegrity,
+  getBookVersions,
+  getVersionById,
+  findVersionByCodeAndVersion,
+  updateBookState,
+  updateVersionState,
+  activateBookVersion
 };
 
 

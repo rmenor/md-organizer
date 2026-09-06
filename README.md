@@ -60,11 +60,18 @@ Drop any `.mdz` or `.zip` book package directly into the browser. MD Organizer a
 - **Direct / Simple Profile**: Reads root `metadata.json` and Markdown chapters. Enables creating a book bundle in seconds.
 - **Automatic Fallback**: Infers book titles, authors, versions, dates, and chapters from YAML frontmatter or document headings if no metadata file is provided.
 
-### 🔄 Smart Versioning & Collision Guard
-Never lose your reading notes or overwrite content accidentally:
-- Each book carries a unique code (`code`), version tag (`version`: e.g. `1.0.0` vs `2.0.0`), and publication date (`publication_date`).
-- **Auto-Update**: If an uploaded book matches an existing code with a newer date/version, the system seamlessly replaces it.
-- **Downgrade Protection**: If an uploaded version is older or identical to the installed one, the system detects the collision and warns you before making changes.
+### 🔄 Strict SemVer 2.0.0, Immutable History & Publication Lifecycle
+- **SemVer 2.0.0 Precedence Engine**: Strict semantic version normalization and comparison (`major.minor.patch-prerelease+build`), evaluating version jumps accurately (e.g. `1.0.0` vs `2.0.0` or `1.1.0-rc.1`).
+- **Immutable Version History (`book_versions`)**: Whenever a new version is published, past versions are archived in the database with their metadata, changelogs, chapter manifests, and isolated storage paths on disk.
+- **Publication Lifecycle States**: Full support for `draft`, `published`, and `archived` states. Manage version visibility and switch active versions with 1-click rollback/activation.
+- **Version Changelogs**: Track and view editorial changelogs and release notes across every historical release.
+
+### 🔍 Comprehensive Version Comparison & Diffing Engine
+Compare any two versions of a book directly within the web interface:
+- **High-Level Metrics & Summary**: Instant calculation of added, removed, modified, and unchanged chapters, along with total word count deltas (net increase/decrease).
+- **Line-by-Line Content Diffing**: Integrated LCS (Longest Common Subsequence) diff algorithm showing exact line additions (`+`), removals (`-`), and unchanged context for modified chapters.
+- **Asset / Resource Diffing**: Tracks images, diagrams, and static assets added, updated, or removed between versions with cryptographic checksum validation.
+- **Visual Modal & Navigation**: Interactive side-by-side comparison modal with status pills, word count indicators, and expandable line diff viewers.
 
 ### 🛡️ Safe Import — Existing Books Are Never Corrupted
 Before touching any file on disk or any database record, every upload goes through a full in-memory validation pass. Only if **all checks pass** does the system write anything — and it does so atomically:
@@ -247,8 +254,8 @@ PORT=8080 node server.js
 
 ### ¿Por qué es diferente?
 - **Compatibilidad Dual e Interoperable**: Ingiere paquetes estándar `.mdz` (con `manifest.json`, `metadata/book.json` y carpetas `chapters/` y `assets/`) y archivos directos `.zip`. Compatible con exportadores de Obsidian, Notion, pipelines de GitHub Actions y generadores automáticos.
-- **Sin compilaciones pesadas**: No necesitas regenerar el sitio web ni hacer commits para agregar libros como en Docusaurus o MkDocs.
-- **Control de Versiones inteligente**: Detecta el código del libro (`code`), compara números de versión y fechas de publicación, actualizando automáticamente las nuevas ediciones o advirtiendo para evitar pérdidas.
+- **SemVer 2.0.0, Historial Inmutable y Ciclo de Vida**: Motor estricto de Semantic Versioning (`major.minor.patch-prerelease+build`) con detección de saltos de versión. Cada publicación archiva de forma inmutable las versiones previas en `book_versions` con sus carpetas aisladas, registro de cambios (`changelog`), estados (`draft` / `published` / `archived`) y rollback/activación con 1 clic.
+- **Comparación entre Versiones y Diffing**: Comparador visual side-by-side de cualquier par de versiones de un libro. Calcula métricas de capítulos añadidos, eliminados y modificados, balance neto de palabras (+/-), diff textual línea por línea mediante algoritmo LCS y trazabilidad de cambios en recursos/assets estáticos.
 - **Importación segura — el libro existente nunca se destruye**: Antes de escribir nada en disco ni en la base de datos, cada subida pasa por una validación completa en memoria. Solo si todos los checks son correctos (archivo no vacío, capítulos Markdown presentes, capítulos del manifest accesibles, sin capítulos vacíos, título y versión válidos) el sistema escribe los archivos en un directorio de staging y después ejecuta la transacción de base de datos. Si algo falla en cualquier punto, el staging se elimina automáticamente y el libro anterior queda **intacto**. Los errores se muestran como lista detallada en el modal de subida.
 - **Copias de Seguridad y Restauración Atómica (Backup & Restore)**: Exporta en un solo clic un archivo `.zip` completo con la instantánea SQLite, metadatos y todos los archivos Markdown de la biblioteca. La restauración cuenta con inspección previa (pre-flight), re-mapeo automático de rutas y rollback automático ante cualquier fallo.
 - **Verificación Criptográfica de Integridad SHA-256**: Generación de huellas digitales SHA-256 por capítulo y hash compuesto canónico por libro durante la importación. Permite auditar en tiempo real (`GET /api/books/:id/integrity` y `GET /api/integrity`) si algún archivo en disco ha sido modificado, dañado o eliminado, con modal interactivo y badges visuales.

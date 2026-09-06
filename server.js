@@ -10,9 +10,15 @@ const {
   deleteBook,
   searchLibrary,
   verifyBookIntegrity,
-  verifyLibraryIntegrity
+  verifyLibraryIntegrity,
+  getBookVersions,
+  getVersionById,
+  updateBookState,
+  updateVersionState,
+  activateBookVersion
 } = require('./src/db');
 const { processZipFile } = require('./src/processor');
+const { compareBookVersions } = require('./src/differ');
 const {
   createBackupArchive,
   inspectBackupArchive,
@@ -188,6 +194,99 @@ app.get('/api/integrity', (req, res) => {
     res.json(report);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint: Historial de versiones de un libro
+app.get('/api/books/:id/versions', (req, res) => {
+  try {
+    const versions = getBookVersions(req.params.id);
+    res.json({ versions });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint: Detalle de una versión específica
+app.get('/api/versions/:id', (req, res) => {
+  try {
+    const version = getVersionById(req.params.id);
+    if (!version) {
+      return res.status(404).json({ error: 'Versión no encontrada' });
+    }
+    res.json({ version });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint: Comparar dos versiones de un libro
+app.get('/api/books/:id/compare', (req, res) => {
+  try {
+    const { from, to, fromId, toId } = req.query;
+    let verA = null;
+    let verB = null;
+
+    if (fromId && toId) {
+      verA = getVersionById(parseInt(fromId, 10));
+      verB = getVersionById(parseInt(toId, 10));
+    } else {
+      const allVersions = getBookVersions(req.params.id);
+      if (from) {
+        verA = allVersions.find(v => v.version === from || v.id === parseInt(from, 10));
+      }
+      if (to) {
+        verB = allVersions.find(v => v.version === to || v.id === parseInt(to, 10));
+      }
+      // Si no se especifican, comparar las dos últimas versiones por defecto
+      if (!verA && allVersions.length >= 2) verA = allVersions[1];
+      if (!verB && allVersions.length >= 1) verB = allVersions[0];
+    }
+
+    if (!verA || !verB) {
+      return res.status(400).json({ error: 'Se requieren dos versiones válidas para comparar.' });
+    }
+
+    const diffReport = compareBookVersions(verA, verB);
+    res.json(diffReport);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint: Actualizar estado de un libro (draft / published / archived)
+app.patch('/api/books/:id/state', (req, res) => {
+  try {
+    const { state } = req.body;
+    const result = updateBookState(parseInt(req.params.id, 10), state);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Endpoint: Actualizar estado de una versión individual
+app.patch('/api/versions/:id/state', (req, res) => {
+  try {
+    const { state } = req.body;
+    const result = updateVersionState(parseInt(req.params.id, 10), state);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Endpoint: Activar una versión previa como la versión principal activa
+app.post('/api/books/:id/activate-version/:versionId', (req, res) => {
+  try {
+    const book = activateBookVersion(parseInt(req.params.id, 10), parseInt(req.params.versionId, 10));
+    res.json({
+      success: true,
+      message: `Versión v${book.version} activada con éxito como versión principal.`,
+      book
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 

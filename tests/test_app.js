@@ -25,7 +25,12 @@ const {
   searchLibrary,
   deleteBook,
   verifyBookIntegrity,
-  verifyLibraryIntegrity
+  verifyLibraryIntegrity,
+  getBookVersions,
+  getVersionById,
+  updateBookState,
+  updateVersionState,
+  activateBookVersion
 } = require('../src/db');
 const { processZipFile, safeResolvePath, securityScanZip } = require('../src/processor');
 const {
@@ -34,6 +39,18 @@ const {
   restoreBackupArchive,
   BACKUP_FORMAT
 } = require('../src/backup');
+const {
+  normalizeSemVer,
+  isValidSemVer,
+  parseSemVer,
+  compareSemVer,
+  diffSemVer
+} = require('../src/semver');
+const {
+  computeLineDiff,
+  readVersionAssets,
+  compareBookVersions
+} = require('../src/differ');
 const AdmZip = require('adm-zip');
 
 test('Las portadas usan una proporción cuadrada', () => {
@@ -74,6 +91,22 @@ test('La pestaña Documentación Completa carga la wiki aunque el panel tenga pl
   assert.match(appSource, /if \(target === 'full'\)\s*\{\s*loadWikiDoc\(\);\s*\}/);
   assert.match(appSource, /if \(wikiDocLoaded && !force\) return;/);
   assert.match(appSource, /wikiDocLoaded = true;/);
+});
+
+test('La pestaña Cómo crear libros ofrece herramientas seguras y su flujo de preparación', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'public/index.html'), 'utf8');
+  const tabs = html.match(/<button class="wiki-tab-chip"[^>]*>.*?<\/button>/g) || [];
+  const fullIndex = tabs.findIndex((tab) => tab.includes('data-wiki-tab="full"'));
+  const createIndex = tabs.findIndex((tab) => tab.includes('data-wiki-tab="create"'));
+  const versionIndex = tabs.findIndex((tab) => tab.includes('data-wiki-tab="version"'));
+
+  assert.ok(fullIndex >= 0 && fullIndex < createIndex && createIndex < versionIndex);
+  assert.match(html, /<div class="wiki-pane hidden" id="pane-create">[\s\S]*Escribe y previsualiza en Markdown[\s\S]*<\/div>/);
+  assert.match(html, /https:\/\/stackedit\.io\/[^>]*target="_blank" rel="noopener noreferrer"/);
+  assert.match(html, /https:\/\/dillinger\.io\/[^>]*target="_blank" rel="noopener noreferrer"/);
+  assert.match(html, /https:\/\/obsidian\.md\/[^>]*target="_blank" rel="noopener noreferrer"/);
+  assert.match(html, /https:\/\/typora\.io\/[^>]*target="_blank" rel="noopener noreferrer"/);
+  assert.match(html, /escribir en Markdown[\s\S]*organizar capítulos, portada y <code>metadata\.json<\/code>[\s\S]*previsualizar\/exportar[\s\S]*comprimir/);
 });
 
 test('Capa de Base de Datos (SQLite3)', async (t) => {
@@ -566,7 +599,282 @@ test('Verificación de Integridad Criptográfica SHA-256', async (t) => {
   });
 });
 
+test('Motor SemVer 2.0.0 (Normalización, Validación, Comparación y Precedencia)', async (t) => {
+  await t.test('1. Normaliza versiones flexibles al formato canónico X.Y.Z', () => {
+    assert.equal(normalizeSemVer('v1.2.3'), '1.2.3');
+    assert.equal(normalizeSemVer('1'), '1.0.0');
+    assert.equal(normalizeSemVer('2.5'), '2.5.0');
+    assert.equal(normalizeSemVer('v3.0.0-rc.1'), '3.0.0-rc.1');
+    assert.equal(normalizeSemVer('v1.0.0+build.42'), '1.0.0+build.42');
+    assert.equal(normalizeSemVer(null), '1.0.0');
+    assert.equal(normalizeSemVer('invalid_str'), '1.0.0');
+  });
+
+  await t.test('2. Valida cadenas según especificación SemVer 2.0.0', () => {
+    assert.equal(isValidSemVer('1.0.0'), true);
+    assert.equal(isValidSemVer('2.1.3-beta.1'), true);
+    assert.equal(isValidSemVer('1.0.0+20130313144700'), true);
+    assert.equal(isValidSemVer('v1.0.0'), false); // SemVer estricto no lleva 'v'
+    assert.equal(isValidSemVer('1.0'), false);
+    assert.equal(isValidSemVer('abc'), false);
+  });
+
+  await t.test('3. Compara versiones con precedencia estricta (Major, Minor, Patch y Pre-release)', () => {
+    // Major
+    assert.equal(compareSemVer('2.0.0', '1.9.9'), 1);
+    assert.equal(compareSemVer('1.0.0', '2.0.0'), -1);
+    // Minor
+    assert.equal(compareSemVer('1.2.0', '1.1.9'), 1);
+    assert.equal(compareSemVer('1.1.0', '1.2.0'), -1);
+    // Patch
+    assert.equal(compareSemVer('1.0.2', '1.0.1'), 1);
+    assert.equal(compareSemVer('1.0.0', '1.0.0'), 0);
+    // Pre-release (1.0.0 normal > 1.0.0 con prerelease)
+    assert.equal(compareSemVer('1.0.0', '1.0.0-alpha'), 1);
+    assert.equal(compareSemVer('1.0.0-alpha', '1.0.0'), -1);
+    assert.equal(compareSemVer('1.0.0-alpha', '1.0.0-alpha.1'), -1);
+    assert.equal(compareSemVer('1.0.0-alpha.1', '1.0.0-alpha.beta'), -1);
+    assert.equal(compareSemVer('1.0.0-beta', '1.0.0-alpha'), 1);
+  });
+
+  await t.test('4. Clasifica el salto de versión (diffSemVer)', () => {
+    assert.equal(diffSemVer('1.0.0', '2.0.0'), 'major');
+    assert.equal(diffSemVer('1.0.0', '1.1.0'), 'minor');
+    assert.equal(diffSemVer('1.0.0', '1.0.1'), 'patch');
+    assert.equal(diffSemVer('1.0.0-alpha', '1.0.0-rc.1'), 'prerelease');
+    assert.equal(diffSemVer('1.0.0', '1.0.0'), 'equal');
+    assert.equal(diffSemVer('2.0.0', '1.0.0'), 'downgrade');
+  });
+});
+
+test('Historial de Versiones Inmutables, Estados (draft/published/archived) y Activación', async (t) => {
+  const tempFiles = [];
+
+  t.before(() => {
+    // Crear v1.0.0
+    const zip1 = new AdmZip();
+    zip1.addFile('metadata.json', Buffer.from(JSON.stringify({
+      code: 'SEMVER-BOOK',
+      title: 'Manual de Arquitectura SemVer',
+      author: 'Core Team',
+      version: '1.0.0',
+      state: 'published',
+      changelog: 'Versión inicial estable con 2 capítulos.',
+      publication_date: '2026-01-01',
+      section: 'Arquitectura',
+      subsection: 'Patrones',
+      chapters: [
+        { number: 1, title: 'Capítulo 1: Fundamentos', file: 'c1.md' },
+        { number: 2, title: 'Capítulo 2: Microservicios', file: 'c2.md' }
+      ]
+    })));
+    zip1.addFile('c1.md', Buffer.from('# Fundamentos\nTexto original del capítulo 1 sobre conceptos base.'));
+    zip1.addFile('c2.md', Buffer.from('# Microservicios\nTexto original del capítulo 2.'));
+    const p1 = path.join(__dirname, 'test_semver_v1.zip');
+    zip1.writeZip(p1);
+    tempFiles.push(p1);
+
+    // Crear v2.0.0 con cambios
+    const zip2 = new AdmZip();
+    zip2.addFile('metadata.json', Buffer.from(JSON.stringify({
+      code: 'SEMVER-BOOK',
+      title: 'Manual de Arquitectura SemVer (v2)',
+      author: 'Core Team',
+      version: '2.0.0',
+      state: 'published',
+      changelog: 'Breaking change: Reescribe capítulo 1 y añade capítulo 3.',
+      publication_date: '2026-02-01',
+      section: 'Arquitectura',
+      subsection: 'Patrones',
+      chapters: [
+        { number: 1, title: 'Capítulo 1: Fundamentos Modernos', file: 'c1.md' },
+        { number: 2, title: 'Capítulo 2: Microservicios', file: 'c2.md' },
+        { number: 3, title: 'Capítulo 3: Event-Driven Architecture', file: 'c3.md' }
+      ]
+    })));
+    zip2.addFile('c1.md', Buffer.from('# Fundamentos Modernos\nTexto COMPLETAMENTE RENOVADO para la versión 2.0.0.'));
+    zip2.addFile('c2.md', Buffer.from('# Microservicios\nTexto original del capítulo 2.'));
+    zip2.addFile('c3.md', Buffer.from('# Event-Driven Architecture\nNuevo capítulo 3 añadido en la versión 2.0.0.'));
+    const p2 = path.join(__dirname, 'test_semver_v2.zip');
+    zip2.writeZip(p2);
+    tempFiles.push(p2);
+  });
+
+  await t.test('1. Ingesta v1.0.0 y comprueba registro en book_versions con estado published', async () => {
+    const res1 = await processZipFile(tempFiles[0]);
+    assert.ok(res1.id > 0);
+
+    const book = getBookById(res1.id);
+    assert.equal(book.version, '1.0.0');
+    assert.equal(book.state, 'published');
+    assert.equal(book.changelog, 'Versión inicial estable con 2 capítulos.');
+
+    const versions = getBookVersions(book.id);
+    assert.equal(versions.length, 1);
+    assert.equal(versions[0].version, '1.0.0');
+    assert.equal(versions[0].state, 'published');
+    assert.ok(versions[0].checksum);
+  });
+
+  await t.test('2. Ingesta v2.0.0, archiva la v1.0.0 inmutablemente y activa v2.0.0', async () => {
+    const res2 = await processZipFile(tempFiles[1]);
+    assert.ok(res2.id > 0);
+
+    const book = getBookById(res2.id);
+    assert.equal(book.version, '2.0.0');
+    assert.equal(book.title, 'Manual de Arquitectura SemVer (v2)');
+    assert.equal(book.chapters.length, 3);
+
+    const versions = getBookVersions(book.id);
+    assert.equal(versions.length, 2);
+
+    const v2 = versions.find(v => v.version === '2.0.0');
+    const v1 = versions.find(v => v.version === '1.0.0');
+
+    assert.ok(v2);
+    assert.ok(v1);
+    assert.equal(v2.state, 'published');
+    assert.equal(v1.state, 'archived');
+    assert.ok(fs.existsSync(v1.storage_path), 'El almacenamiento de la v1 debe permanecer intacto');
+    assert.ok(fs.existsSync(v2.storage_path), 'El almacenamiento de la v2 debe existir');
+  });
+
+  await t.test('3. Permite actualizar el estado de una versión individual y del libro', () => {
+    const book = findBookByCode('SEMVER-BOOK');
+    assert.ok(book);
+
+    updateBookState(book.id, 'draft');
+    const updatedBook = getBookById(book.id);
+    assert.equal(updatedBook.state, 'draft');
+
+    const versions = getBookVersions(book.id);
+    const v1 = versions.find(v => v.version === '1.0.0');
+    updateVersionState(v1.id, 'draft');
+    const updatedV1 = getVersionById(v1.id);
+    assert.equal(updatedV1.state, 'draft');
+  });
+
+  await t.test('4. Activa y restaura una versión previa (Rollback de versión)', () => {
+    const book = findBookByCode('SEMVER-BOOK');
+    const versions = getBookVersions(book.id);
+    const v1 = versions.find(v => v.version === '1.0.0');
+
+    const result = activateBookVersion(book.id, v1.id);
+    assert.equal(result.success, true);
+    assert.equal(result.activated_version, '1.0.0');
+
+    const activeBook = getBookById(book.id);
+    assert.equal(activeBook.version, '1.0.0');
+    assert.equal(activeBook.chapters.length, 2);
+  });
+
+  t.after(() => {
+    tempFiles.forEach(f => {
+      if (fs.existsSync(f)) fs.unlinkSync(f);
+    });
+  });
+});
+
+test('Motor de Comparación de Versiones y Diffing (Capítulos, Contenido y Assets)', async (t) => {
+  await t.test('1. computeLineDiff genera correctamente las adiciones, eliminaciones e invariantes', () => {
+    const textA = 'Línea 1\nLínea 2 original\nLínea 3';
+    const textB = 'Línea 1\nLínea 2 modificada\nLínea 2.5 nueva\nLínea 3';
+
+    const diff = computeLineDiff(textA, textB);
+    assert.ok(diff.length >= 4);
+
+    const added = diff.filter(d => d.type === 'added');
+    const removed = diff.filter(d => d.type === 'removed');
+    const unchanged = diff.filter(d => d.type === 'unchanged');
+
+    assert.ok(added.some(d => d.text === 'Línea 2 modificada'));
+    assert.ok(added.some(d => d.text === 'Línea 2.5 nueva'));
+    assert.ok(removed.some(d => d.text === 'Línea 2 original'));
+    assert.ok(unchanged.some(d => d.text === 'Línea 1'));
+    assert.ok(unchanged.some(d => d.text === 'Línea 3'));
+  });
+
+  await t.test('2. compareBookVersions produce un reporte exhaustivo de diferencias entre versiones', () => {
+    const tempDirA = path.join(TEST_LIB_PATH, 'diff_test_v1');
+    const tempDirB = path.join(TEST_LIB_PATH, 'diff_test_v2');
+
+    fs.mkdirSync(path.join(tempDirA, 'assets'), { recursive: true });
+    fs.mkdirSync(path.join(tempDirB, 'assets'), { recursive: true });
+
+    // Archivos de capítulos
+    fs.writeFileSync(path.join(tempDirA, 'ch1.md'), 'Capítulo 1 versión antigua\nLínea borrada.');
+    fs.writeFileSync(path.join(tempDirB, 'ch1.md'), 'Capítulo 1 versión nueva\nLínea añadida.');
+    fs.writeFileSync(path.join(tempDirA, 'ch2_old.md'), 'Capítulo que será eliminado en v2.');
+    fs.writeFileSync(path.join(tempDirB, 'ch3_new.md'), 'Capítulo nuevo creado exclusivamente en v2.');
+
+    // Assets
+    fs.writeFileSync(path.join(tempDirA, 'assets', 'diagram.png'), Buffer.from('image1_data'));
+    fs.writeFileSync(path.join(tempDirB, 'assets', 'diagram.png'), Buffer.from('image2_modified_data'));
+    fs.writeFileSync(path.join(tempDirB, 'assets', 'logo.svg'), Buffer.from('<svg>logo</svg>'));
+
+    const versionA = {
+      id: 101,
+      code: 'DIFF-TEST',
+      title: 'Libro de Comparación',
+      version: '1.0.0',
+      state: 'archived',
+      storage_path: tempDirA,
+      chapters: [
+        { order_index: 1, title: 'Cap 1', relative_path: 'ch1.md', checksum: 'hash_a_1', word_count: 6 },
+        { order_index: 2, title: 'Cap 2', relative_path: 'ch2_old.md', checksum: 'hash_a_2', word_count: 7 }
+      ]
+    };
+
+    const versionB = {
+      id: 102,
+      code: 'DIFF-TEST',
+      title: 'Libro de Comparación v2',
+      version: '2.0.0',
+      state: 'published',
+      storage_path: tempDirB,
+      chapters: [
+        { order_index: 1, title: 'Cap 1 Modificado', relative_path: 'ch1.md', checksum: 'hash_b_1', word_count: 6 },
+        { order_index: 3, title: 'Cap 3 Nuevo', relative_path: 'ch3_new.md', checksum: 'hash_b_3', word_count: 7 }
+      ]
+    };
+
+    const report = compareBookVersions(versionA, versionB, { includeLineDiff: true });
+
+    assert.equal(report.book.code, 'DIFF-TEST');
+    assert.equal(report.comparison.semverJump, 'major');
+    assert.equal(report.comparison.hasChanges, true);
+
+    // Métricas de capítulos
+    const chapSummary = report.comparison.summary.chapters;
+    assert.equal(chapSummary.totalA, 2);
+    assert.equal(chapSummary.totalB, 2);
+    assert.equal(chapSummary.added, 1);
+    assert.equal(chapSummary.removed, 1);
+    assert.equal(chapSummary.modified, 1);
+
+    // Métricas de assets
+    const assetSummary = report.comparison.summary.assets;
+    assert.equal(assetSummary.modified, 1);
+    assert.equal(assetSummary.added, 1);
+
+    // Validar detalles de capítulos
+    const modifiedCh = report.chapters.find(c => c.status === 'modified');
+    assert.ok(modifiedCh);
+    assert.equal(modifiedCh.relative_path, 'ch1.md');
+    assert.ok(modifiedCh.diff.length > 0);
+
+    const addedCh = report.chapters.find(c => c.status === 'added');
+    assert.ok(addedCh);
+    assert.equal(addedCh.relative_path, 'ch3_new.md');
+
+    const removedCh = report.chapters.find(c => c.status === 'removed');
+    assert.ok(removedCh);
+    assert.equal(removedCh.relative_path, 'ch2_old.md');
+  });
+});
+
 test.after(() => {
   if (fs.existsSync(TEST_DB_PATH)) fs.unlinkSync(TEST_DB_PATH);
   if (fs.existsSync(TEST_LIB_PATH)) fs.rmSync(TEST_LIB_PATH, { recursive: true, force: true });
 });
+
