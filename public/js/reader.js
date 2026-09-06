@@ -52,7 +52,12 @@ const Reader = (() => {
 
   function safeMarkdownFragment(markdown, bookId) {
     const parsed = new DOMParser().parseFromString(marked.parse(String(markdown || '')), 'text/html');
-    const allowed = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'UL', 'OL', 'LI', 'A', 'IMG', 'PRE', 'CODE', 'BLOCKQUOTE', 'EM', 'STRONG', 'DEL', 'BR', 'HR']);
+    const allowed = new Set([
+      'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'UL', 'OL', 'LI', 'A', 'IMG',
+      'PRE', 'CODE', 'BLOCKQUOTE', 'EM', 'STRONG', 'DEL', 'BR', 'HR',
+      'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TH', 'TD',
+      'SPAN', 'DIV', 'I', 'B', 'S', 'KBD', 'SUP', 'SUB', 'MARK', 'SMALL'
+    ]);
     const fragment = document.createDocumentFragment();
     const safeUrl = (value, image = false) => {
       if (image && /^(?:\.\/)?assets\//i.test(value)) {
@@ -72,9 +77,28 @@ const Reader = (() => {
       if (node.nodeType !== Node.ELEMENT_NODE) return;
       if (!allowed.has(node.tagName)) { [...node.childNodes].forEach(child => copy(child, parent)); return; }
       const out = document.createElement(node.tagName.toLowerCase());
-      if (node.tagName === 'A') { const href = safeUrl(node.getAttribute('href') || ''); if (href !== '#') out.href = href; }
-      if (node.tagName === 'IMG') { const src = safeUrl(node.getAttribute('src') || '', true); if (!src) return; out.src = src; out.alt = node.getAttribute('alt') || ''; }
-      if (node.tagName === 'CODE' && node.className) out.className = node.className.replace(/[^a-zA-Z0-9 _-]/g, '');
+      if (node.tagName === 'A') {
+        const href = safeUrl(node.getAttribute('href') || '');
+        if (href !== '#') out.href = href;
+        if (node.getAttribute('target') === '_blank') {
+          out.target = '_blank';
+          out.rel = 'noopener noreferrer';
+        }
+      }
+      if (node.tagName === 'IMG') {
+        const src = safeUrl(node.getAttribute('src') || '', true);
+        if (!src) return;
+        out.src = src;
+        out.alt = node.getAttribute('alt') || '';
+        if (node.getAttribute('title')) out.title = node.getAttribute('title');
+      }
+      if ((node.tagName === 'CODE' || node.tagName === 'PRE' || node.tagName === 'SPAN' || node.tagName === 'DIV') && node.className) {
+        out.className = node.className.replace(/[^a-zA-Z0-9 _-]/g, '');
+      }
+      if (node.tagName === 'TH' || node.tagName === 'TD') {
+        const align = node.getAttribute('align');
+        if (align && /^(left|center|right|justify)$/i.test(align)) out.setAttribute('align', align);
+      }
       [...node.childNodes].forEach(child => copy(child, out));
       parent.appendChild(out);
     };

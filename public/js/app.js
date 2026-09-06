@@ -92,7 +92,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function safeMarkdownFragment(markdown) {
     const parsed = new DOMParser().parseFromString(marked.parse(String(markdown || '')), 'text/html');
-    const allowed = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'UL', 'OL', 'LI', 'A', 'IMG', 'PRE', 'CODE', 'BLOCKQUOTE', 'EM', 'STRONG', 'DEL', 'BR', 'HR']);
+    const allowed = new Set([
+      'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'UL', 'OL', 'LI', 'A', 'IMG',
+      'PRE', 'CODE', 'BLOCKQUOTE', 'EM', 'STRONG', 'DEL', 'BR', 'HR',
+      'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TH', 'TD',
+      'SPAN', 'DIV', 'I', 'B', 'S', 'KBD', 'SUP', 'SUB', 'MARK', 'SMALL'
+    ]);
     const fragment = document.createDocumentFragment();
     const safeUrl = (value, image = false) => {
       try {
@@ -107,9 +112,28 @@ document.addEventListener('DOMContentLoaded', () => {
       if (node.nodeType !== Node.ELEMENT_NODE) return;
       if (!allowed.has(node.tagName)) { [...node.childNodes].forEach(child => copy(child, parent)); return; }
       const out = document.createElement(node.tagName.toLowerCase());
-      if (node.tagName === 'A') { const href = safeUrl(node.getAttribute('href') || ''); if (href !== '#') out.href = href; }
-      if (node.tagName === 'IMG') { const src = safeUrl(node.getAttribute('src') || '', true); if (!src) return; out.src = src; out.alt = node.getAttribute('alt') || ''; }
-      if (node.tagName === 'CODE' && node.className) out.className = node.className.replace(/[^a-zA-Z0-9 _-]/g, '');
+      if (node.tagName === 'A') {
+        const href = safeUrl(node.getAttribute('href') || '');
+        if (href !== '#') out.href = href;
+        if (node.getAttribute('target') === '_blank') {
+          out.target = '_blank';
+          out.rel = 'noopener noreferrer';
+        }
+      }
+      if (node.tagName === 'IMG') {
+        const src = safeUrl(node.getAttribute('src') || '', true);
+        if (!src) return;
+        out.src = src;
+        out.alt = node.getAttribute('alt') || '';
+        if (node.getAttribute('title')) out.title = node.getAttribute('title');
+      }
+      if ((node.tagName === 'CODE' || node.tagName === 'PRE' || node.tagName === 'SPAN' || node.tagName === 'DIV') && node.className) {
+        out.className = node.className.replace(/[^a-zA-Z0-9 _-]/g, '');
+      }
+      if (node.tagName === 'TH' || node.tagName === 'TD') {
+        const align = node.getAttribute('align');
+        if (align && /^(left|center|right|justify)$/i.test(align)) out.setAttribute('align', align);
+      }
       [...node.childNodes].forEach(child => copy(child, out));
       parent.appendChild(out);
     };
@@ -744,6 +768,8 @@ document.addEventListener('DOMContentLoaded', () => {
     showMainView('wiki');
   }
 
+  let wikiDocLoaded = false;
+
   wikiTabChips.forEach(chip => {
     chip.addEventListener('click', () => {
       wikiTabChips.forEach(c => c.classList.remove('active'));
@@ -753,6 +779,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const target = chip.getAttribute('data-wiki-tab');
       const pane = document.getElementById(`pane-${target}`);
       if (pane) pane.classList.remove('hidden');
+      if (target === 'full') {
+        loadWikiDoc();
+      }
     });
   });
 
@@ -764,19 +793,27 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  async function loadWikiDoc() {
-    if (wikiMarkdownContainer.innerHTML.trim().length > 20) return;
+  async function loadWikiDoc(force = false) {
+    if (wikiDocLoaded && !force) return;
     try {
       const res = await fetch('/api/wiki');
       if (res.ok) {
         const data = await res.json();
         wikiMarkdownContainer.replaceChildren(safeMarkdownFragment(data.content));
+        if (window.hljs) {
+          wikiMarkdownContainer.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+        }
+        wikiDocLoaded = true;
         return;
       }
       const resFallback = await fetch('/WIKI_COMO_HACER_LIBROS.md');
       if (!resFallback.ok) throw new Error();
       const md = await resFallback.text();
       wikiMarkdownContainer.replaceChildren(safeMarkdownFragment(md));
+      if (window.hljs) {
+        wikiMarkdownContainer.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+      }
+      wikiDocLoaded = true;
     } catch {
       wikiMarkdownContainer.innerHTML = '<p>Consulta la pestaña Guía Rápida para conocer la estructura de archivos.</p>';
     }

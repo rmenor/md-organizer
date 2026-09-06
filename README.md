@@ -244,6 +244,24 @@ PORT=8080 node server.js
   - Adaptado 100% para lectura cómoda en móviles y tablets.
 - **Ligero y Rápido**: Backend en Node.js con SQLite3 (`better-sqlite3`) y frontend vanilla sin dependencias pesadas.
 
+### 🆚 Comparativa general
+
+A continuación se muestra una comparación general de capacidades entre MD Organizer y otras herramientas del ecosistema. Las marcas pueden variar según la configuración, edición o plugins habilitados en cada proyecto.
+
+| Proyecto | Markdown | Libro/capítulos | ZIP paquete | Biblioteca | Reader web | DB | Versionado | Importación dinámica |
+|---|---|---|---|---|---|---|---|---|
+| Tu aplicación | ✅ | ✅ | ✅ | ✅ | ✅ | SQLite | ✅ | ✅ |
+| Gitshelf | ✅ | ✅ | ✅ | ✅ | ✅ | Git | parcial | ⚠️ |
+| MDZ | ✅ | ⚠️ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| BookStack | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | parcial | ⚠️ |
+| Readest | ✅ | ✅ | ❌ | ✅ | ✅ | local/server | parcial | ❌ |
+| Book Studio | ✅ | ✅ | ❌ | ✅ | ✅ | PostgreSQL | parcial | ❌ |
+| mdBook | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Fumadocs | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Docusaurus | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ |
+| Leo Reader | ✅ | ✅ | ✅ | ✅ | ❌/local | SQLite | ✅ | ✅ |
+| Calibre-Web | ❌/parcial | ✅ | ❌ | ✅ | ✅ | SQLite | ❌ | ❌ |
+| Kavita | ❌ | ✅ | ❌ | ✅ | ✅ | DB | parcial | ❌ |
 
 ---
 
