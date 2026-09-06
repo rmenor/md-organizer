@@ -1,0 +1,28 @@
+{
+  "code": "BK-CLEAN-CODE",
+  "title": "El Arte del Código Limpio",
+  "author": "Ada Lovelace & Martin Fowler",
+  "version": "2.0.0",
+  "date": "2025-06-01",
+  "publication_date": "2025-06-01",
+  "description": "Edición 2.0.0 (2025-06-01). Una guía práctica para diseñar software legible y desacoplado. [Versión actualizada]",
+  "section": "Ingeniería de Software",
+  "subsection": "Buenas Prácticas",
+  "cover": "assets/cover.png",
+  "language": "es",
+  "updated_at": "2026-09-05T23:51:00.206Z",
+  "chapters": [
+    {
+      "order": 1,
+      "title": "Capítulo 1: Nombres con Significado (v2.0.0)",
+      "file": "01_01_nombres_con_significado.md",
+      "words": 54
+    },
+    {
+      "order": 2,
+      "title": "Capítulo 2: Funciones Pequeñas y Enfocadas (v2.0.0)",
+      "file": "02_02_funciones_pequenas.md",
+      "words": 17
+    }
+  ]
+}

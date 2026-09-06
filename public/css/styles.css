@@ -1,0 +1,2029 @@
+/* ==========================================================================
+   ATHENAEUM - SISTEMA DE DISEÑO MODERNO (100% CUADRADO)
+   - Sin bordes redondeados (border-radius: 0 en todos los elementos)
+   - Combinación de colores sobria, equilibrada y de alto contraste
+   - Botones de navegación del lector anclados abajo del todo en móvil
+   - Textos perfectamente legibles en todos los modos
+   ========================================================================== */
+
+:root {
+  /* Paleta Base Oscura (ESTÁNDAR) */
+  --app-bg-window: #181818;
+  --app-bg-surface: #202020;
+  --app-bg-tile: #272727;
+  --app-bg-tile-hover: #323232;
+  --app-bg-tile-selected: #3c3c3c;
+  --app-bg-card: #222222;
+  --app-border: #383838;
+  --app-border-subtle: #2e2e2e;
+  --app-border-focus: #5a5a5a;
+
+  /* Acento Púrpura Icónico  */
+  --app-purple-active: #9b51e0;
+  --app-purple-accent: #8e44ad;
+  --app-purple-light: #b070ec;
+  --app-purple-bg: rgba(155, 81, 224, 0.15);
+
+  /* Colores Semánticos */
+  --app-danger: #e74c3c;
+  --app-success: #2ecc71;
+  --app-warning: #f39c12;
+
+  /* Tipografía y Textos de Alto Contraste (Garantía de Legibilidad) */
+  --app-text-main: #ffffff;
+  --app-text-muted: #d6d6d6;
+  --app-text-dim: #a0a0a0;
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Newsreader', Georgia, serif;
+  --font-mono: 'Fira Code', monospace;
+
+  /* Bloques de código y sintaxis (Alto contraste) */
+  --code-block-bg: #141416;
+  --code-block-text: #f0f6fc;
+  --code-block-border: #383838;
+  --code-inline-bg: rgba(255, 255, 255, 0.08);
+  --code-inline-text: #c084fc;
+
+  /* Dimensiones */
+  --topbar-height: 52px;
+  --subtabs-height: 44px;
+  --reader-nav-height: 60px;
+}
+
+/* Modo Sepia (Armonizado y con Alto Contraste) */
+body.theme-sepia {
+  --app-bg-window: #fbf0d9;
+  --app-bg-surface: #f4e6c7;
+  --app-bg-tile: #ede0c2;
+  --app-bg-tile-hover: #e2d2b0;
+  --app-bg-tile-selected: #d7c5a0;
+  --app-bg-card: #f7eed8;
+  --app-border: #d4c19c;
+  --app-border-subtle: #dfceab;
+  --app-text-main: #2b1d0c;
+  --app-text-muted: #523e26;
+  --app-text-dim: #786043;
+  --app-purple-active: #8b3ab0;
+  --code-block-bg: #221c15;
+  --code-block-text: #fef8eb;
+  --code-block-border: #523e26;
+  --code-inline-bg: rgba(60, 40, 15, 0.08);
+  --code-inline-text: #8b3ab0;
+}
+
+/* Modo Claro (Armonizado y con Alto Contraste - Jamás texto blanco sobre blanco) */
+body.theme-light {
+  --app-bg-window: #f4f5f7;
+  --app-bg-surface: #ffffff;
+  --app-bg-tile: #ffffff;
+  --app-bg-tile-hover: #f0f1f3;
+  --app-bg-tile-selected: #e5e7eb;
+  --app-bg-card: #ffffff;
+  --app-border: #dcdfe4;
+  --app-border-subtle: #eaedf1;
+  --app-text-main: #111827;
+  --app-text-muted: #374151;
+  --app-text-dim: #4b5563;
+  --app-purple-active: #7c3aed;
+  --code-block-bg: #1e1e24;
+  --code-block-text: #f8fafc;
+  --code-block-border: #334155;
+  --code-inline-bg: rgba(124, 58, 237, 0.08);
+  --code-inline-text: #7c3aed;
+}
+
+/* Regla de Oro: TODO CUADRADO */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  border-radius: 0 !important; /* Estricta geometría cuadrada sin curvas */
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--app-bg-window);
+  color: var(--app-text-main);
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  letter-spacing: -0.01em;
+}
+
+/* ==========================================================================
+   1. CABECERA SUPERIOR (TOPBAR MODERNO)
+   ========================================================================== */
+.app-topbar {
+  height: var(--topbar-height);
+  background-color: var(--app-bg-surface);
+  border-bottom: 1px solid var(--app-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  user-select: none;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 120px;
+}
+
+/* Decoración de 3 libritos minimalistas (Rojo, Amarillo, Verde) */
+.window-decor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: opacity 0.15s ease;
+}
+
+.window-decor:hover {
+  opacity: 0.9;
+}
+
+.decor-book {
+  width: 13px;
+  height: 16px;
+  display: inline-block;
+  flex-shrink: 0;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.18s ease;
+}
+
+.decor-book:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.15) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+}
+
+.btn-topbar-nav {
+  background: var(--app-bg-tile);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-main);
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  padding: 0.35rem 0.65rem;
+  transition: background-color 0.15s;
+}
+
+.btn-topbar-nav:hover {
+  background-color: var(--app-bg-tile-hover);
+}
+
+/* Título Centralizado: Biblioteca / Idioma */
+.topbar-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  flex: 1;
+}
+
+.header-main-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--app-text-main);
+  line-height: 1.15;
+}
+
+.header-sub-title {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--app-text-muted);
+  line-height: 1.1;
+  margin-top: 1px;
+}
+
+/* Acciones en la derecha */
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 120px;
+  justify-content: flex-end;
+}
+
+.btn-topbar-upload {
+  background-color: var(--app-purple-active);
+  color: #ffffff;
+  border: 1px solid var(--app-purple-active);
+  padding: 0.32rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  height: 32px;
+  box-sizing: border-box;
+  transition: background-color 0.15s, opacity 0.15s;
+  user-select: none;
+}
+
+.btn-topbar-upload:hover {
+  background-color: var(--app-purple-accent);
+}
+
+.btn-topbar-upload svg {
+  stroke: #ffffff;
+  flex-shrink: 0;
+}
+
+.btn-top-icon {
+  background: none;
+  border: 1px solid transparent;
+  color: var(--app-text-main);
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.btn-top-icon:hover {
+  background-color: var(--app-bg-tile-hover);
+  border-color: var(--app-border);
+}
+
+.btn-top-icon.active {
+  background-color: var(--app-bg-tile-hover);
+  border-color: var(--app-accent-purple);
+  color: var(--app-accent-purple);
+}
+
+/* ==========================================================================
+   2. BARRA DE SUB-PESTAÑAS (SUBTABS CON SUBRAYADO PÚRPURA)
+   ========================================================================== */
+.app-subtabs {
+  background-color: var(--app-bg-window);
+  border-bottom: 1px solid var(--app-border);
+  height: var(--subtabs-height);
+  position: sticky;
+  top: var(--topbar-height);
+  z-index: 40;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.app-subtabs::-webkit-scrollbar {
+  display: none;
+}
+
+.subtabs-scroll {
+  display: inline-flex;
+  align-items: stretch;
+  height: 100%;
+  padding: 0 0.5rem;
+  white-space: nowrap;
+  width: max-content;
+  min-width: 100%;
+}
+
+.subtab-btn {
+  background: none;
+  border: none;
+  color: var(--app-text-muted);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  position: relative;
+  transition: color 0.15s, background-color 0.15s;
+  height: 100%;
+  flex-shrink: 0;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.subtab-btn:hover {
+  color: var(--app-text-main);
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.subtab-btn.active {
+  color: var(--app-text-main);
+}
+
+.subtab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: var(--app-purple-active);
+}
+
+/* ==========================================================================
+   3. BUSCADOR DESPLEGABLE
+   ========================================================================== */
+.search-drawer {
+  background-color: var(--app-bg-surface);
+  border-bottom: 1px solid var(--app-border);
+  padding: 0.65rem 1rem;
+  position: sticky;
+  top: calc(var(--topbar-height) + var(--subtabs-height));
+  z-index: 35;
+  animation: slideDown 0.15s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.search-drawer-inner {
+  display: flex;
+  align-items: center;
+  max-width: 900px;
+  margin: 0 auto;
+  position: relative;
+  gap: 0.5rem;
+}
+
+.drawer-search-ico {
+  position: absolute;
+  left: 0.85rem;
+  color: var(--app-text-dim);
+}
+
+.search-drawer-inner input {
+  flex: 1;
+  background-color: var(--app-bg-window);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-main);
+  padding: 0.6rem 2.2rem 0.6rem 2.4rem;
+  font-size: 0.9rem;
+  font-family: var(--font-sans);
+  outline: none;
+}
+
+.search-drawer-inner input:focus {
+  border-color: var(--app-purple-active);
+}
+
+.btn-clear-search {
+  position: absolute;
+  right: 5.5rem;
+  background: none;
+  border: none;
+  color: var(--app-text-dim);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.btn-close-search {
+  background: var(--app-bg-tile);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-main);
+  padding: 0.6rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-close-search:hover {
+  background-color: var(--app-bg-tile-hover);
+}
+
+/* ==========================================================================
+   4. CUADRÍCULA DE BALDOSAS / CATEGORÍAS (100% CUADRADAS )
+   ========================================================================== */
+.grid-container {
+  padding: 1.25rem 1rem 3rem 1rem;
+  max-width: 1300px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px; /* Líneas de cuadrícula perfectas y nítidas */
+  background-color: var(--app-border);
+  border: 1px solid var(--app-border);
+}
+
+.category-tile {
+  background-color: var(--app-bg-tile);
+  padding: 1.15rem 1.3rem;
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  cursor: pointer;
+  min-height: 76px;
+  transition: background-color 0.12s ease;
+  user-select: none;
+  outline: none;
+}
+
+.category-tile:hover {
+  background-color: var(--app-bg-tile-hover);
+}
+
+.category-tile:focus-visible {
+  background-color: var(--app-bg-tile-hover);
+  outline: 2px solid var(--app-purple-active);
+}
+
+/* Baldosa destacada (como "Otras" en la referencia) */
+.category-tile.tile-highlighted {
+  background-color: var(--app-bg-tile-selected);
+}
+
+.category-tile.tile-highlighted:hover {
+  background-color: #444444;
+}
+
+.tile-icon {
+  color: var(--app-text-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+}
+
+.tile-icon svg {
+  stroke: var(--app-text-main);
+  stroke-width: 1.75;
+}
+
+.tile-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+.tile-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--app-text-main);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tile-meta {
+  font-size: 0.72rem;
+  color: var(--app-text-muted);
+  margin-top: 2px;
+}
+
+/* ==========================================================================
+   5. VISTA DE PUBLICACIONES Y LIBROS
+   ========================================================================== */
+.publications-view {
+  max-width: 1300px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 1rem;
+}
+
+.publications-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0.25rem 1.25rem 0.25rem;
+  border-bottom: 1px solid var(--app-border);
+  margin-bottom: 1.5rem;
+}
+
+.filter-headline {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.btn-grid-return {
+  background: var(--app-bg-tile);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-main);
+  padding: 0.45rem 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+
+.btn-grid-return:hover {
+  background-color: var(--app-bg-tile-hover);
+}
+
+.toolbar-divider {
+  color: var(--app-text-dim);
+}
+
+.active-category-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--app-text-main);
+}
+
+.category-badge-count {
+  font-size: 0.78rem;
+  background-color: var(--app-bg-tile);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-main);
+  padding: 0.15rem 0.55rem;
+  font-weight: 700;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-action {
+  background: var(--app-bg-tile);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-main);
+  padding: 0.5rem 0.95rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.btn-action:hover {
+  background-color: var(--app-bg-tile-hover);
+}
+
+/* ==========================================================================
+   CUADRÍCULA DE LIBROS (SOLO PORTADA Y TÍTULO - ESTILO BIBLIOTECA)
+   ========================================================================== */
+.books-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+  gap: 1.5rem 1.25rem;
+  padding: 0.5rem 0;
+}
+
+.book-grid-card {
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  background: none;
+  border: none;
+  user-select: none;
+  outline: none;
+  transition: transform 0.15s ease;
+}
+
+.book-grid-card:hover {
+  transform: translateY(-4px);
+}
+
+.book-cover-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  background-color: #1a1a1a;
+  border: 1px solid var(--app-border);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem 0.75rem;
+  overflow: hidden;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.book-grid-card:hover .book-cover-wrap {
+  border-color: var(--app-purple-active);
+  box-shadow: 0 8px 24px rgba(155, 81, 224, 0.3);
+}
+
+/* Colores elegantes de cubiertas (combinación armónica sobria) */
+.cover-emerald {
+  background: linear-gradient(145deg, #09382b 0%, #064e3b 100%);
+  border-left: 5px solid #10b981;
+}
+
+.cover-ruby {
+  background: linear-gradient(145deg, #4c1117 0%, #7f1d1d 100%);
+  border-left: 5px solid #ef4444;
+}
+
+.cover-navy {
+  background: linear-gradient(145deg, #0d233e 0%, #1e3a8a 100%);
+  border-left: 5px solid #3b82f6;
+}
+
+.cover-obsidian {
+  background: linear-gradient(145deg, #22262d 0%, #181c22 100%);
+  border-left: 5px solid #94a3b8;
+}
+
+.cover-purple {
+  background: linear-gradient(145deg, #32134b 0%, #581c87 100%);
+  border-left: 5px solid #a855f7;
+}
+
+.book-cover-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.book-cover-title-emboss {
+  font-family: var(--font-serif);
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.book-real-cover {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.btn-book-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  background-color: rgba(0, 0, 0, 0.75);
+  border: 1px solid var(--app-border);
+  color: #cccccc;
+  font-size: 0.72rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s, background-color 0.15s;
+  cursor: pointer;
+}
+
+.book-grid-card:hover .btn-book-delete {
+  opacity: 1;
+}
+
+.btn-book-delete:hover {
+  background-color: var(--app-danger);
+  color: #ffffff;
+}
+
+.book-progress-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: #51cf66;
+  border: 1px solid rgba(81, 207, 102, 0.4);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+  z-index: 3;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.reader-resume-toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--app-bg-surface);
+  border: 1px solid var(--app-accent-purple);
+  color: var(--app-text-main);
+  font-size: 0.86rem;
+  font-weight: 600;
+  padding: 0.55rem 1.15rem;
+  border-radius: 9999px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+  animation: resumeToastIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.reader-resume-toast.fade-out {
+  opacity: 0;
+  transform: translate(-50%, 10px);
+}
+
+@keyframes resumeToastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 15px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.book-title-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--app-text-main);
+  line-height: 1.3;
+  margin-top: 0.65rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-align: left;
+}
+
+.book-grid-card:hover .book-title-label {
+  color: var(--app-purple-light);
+}
+
+/* ==========================================================================
+   6. VISTA DE SECCIONES JERÁRQUICAS (ALTO CONTRASTE)
+   ========================================================================== */
+.sections-view, .updates-view, .wiki-view {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 1.5rem 1rem 3rem 1rem;
+}
+
+.sections-view-header, .updates-view-header, .wiki-view-header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.sections-view-header h2, .updates-view-header h2, .wiki-view-header h2 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--app-text-main);
+  margin-bottom: 0.35rem;
+}
+
+.sections-view-header p, .updates-view-header p, .wiki-view-header p {
+  font-size: 0.88rem;
+  color: var(--app-text-muted);
+}
+
+.section-accordion {
+  background-color: var(--app-bg-card);
+  border: 1px solid var(--app-border);
+  margin-bottom: 0.85rem;
+  overflow: hidden;
+}
+
+.section-accordion-header {
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  background-color: var(--app-bg-tile);
+  border-bottom: 1px solid transparent;
+}
+
+.section-accordion-header:hover {
+  background-color: var(--app-bg-tile-hover);
+}
+
+.section-accordion-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--app-text-main);
+}
+
+.subsections-nested-list {
+  padding: 0.6rem 1rem;
+  border-top: 1px solid var(--app-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  background-color: var(--app-bg-window);
+}
+
+.nested-sub-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.95rem;
+  cursor: pointer;
+  background-color: var(--app-bg-surface);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-main);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.nested-sub-row:hover {
+  background-color: var(--app-bg-tile-hover);
+  border-color: var(--app-purple-active);
+}
+
+/* ==========================================================================
+   7. VISTA DE ACTUALIZACIONES Y VERSIONES
+   ========================================================================== */
+.updates-card-item {
+  background-color: var(--app-bg-card);
+  border: 1px solid var(--app-border);
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.update-book-info h4 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--app-text-main);
+  margin-bottom: 0.3rem;
+}
+
+.update-book-meta {
+  font-size: 0.82rem;
+  color: var(--app-text-muted);
+}
+
+.update-book-meta strong {
+  color: var(--app-text-main);
+}
+
+.update-status-pill {
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.35rem 0.75rem;
+  background-color: rgba(46, 204, 113, 0.15);
+  color: #2ecc71;
+  border: 1px solid rgba(46, 204, 113, 0.4);
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   8. LECTOR DE PUBLICACIONES (BOTONES ANCLADOS ABAJO DEL TODO EN MÓVIL)
+   ========================================================================== */
+.reader-view {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--app-bg-window);
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+}
+
+.reader-topbar {
+  height: var(--topbar-height);
+  background-color: var(--app-bg-surface);
+  border-bottom: 1px solid var(--app-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.btn-reader-back {
+  background: var(--app-bg-tile);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-main);
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  padding: 0.4rem 0.75rem;
+}
+
+.btn-reader-back:hover {
+  background-color: var(--app-bg-tile-hover);
+}
+
+.reader-header-info {
+  text-align: center;
+  flex: 1;
+  padding: 0 0.75rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.reader-header-info h2 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--app-text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reader-sub {
+  font-size: 0.72rem;
+  color: var(--app-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.reader-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.theme-switchers-compact {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 0.4rem;
+}
+
+.btn-theme-dot {
+  width: 18px;
+  height: 18px;
+  background-color: #222222;
+  border: 1px solid #555555;
+  cursor: pointer;
+}
+
+.btn-theme-dot.active {
+  border-color: var(--app-purple-active);
+  outline: 1px solid var(--app-purple-active);
+}
+
+.theme-dot-sepia { background-color: #f4e6c7; }
+.theme-dot-light { background-color: #ffffff; }
+
+.btn-reader-action, .btn-reader-toc {
+  background: var(--app-bg-tile);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-main);
+  padding: 0.4rem 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-reader-action:hover, .btn-reader-toc:hover {
+  background-color: var(--app-bg-tile-hover);
+}
+
+.reader-workspace {
+  flex: 1;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+.reader-toc-sheet {
+  width: 320px;
+  background-color: var(--app-bg-surface);
+  border-right: 1px solid var(--app-border);
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: var(--reader-nav-height);
+  z-index: 20;
+  transform: translateX(-100%);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reader-toc-sheet.open {
+  transform: translateX(0);
+}
+
+.toc-sheet-header {
+  padding: 1rem;
+  border-bottom: 1px solid var(--app-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toc-sheet-header h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--app-text-main);
+}
+
+.toc-progress-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background-color: var(--app-bg-tile);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-muted);
+  padding: 0.2rem 0.5rem;
+}
+
+/* Opciones de lectura integradas en el Sidebar (TOC) */
+.toc-reading-options {
+  padding: 0.85rem 1rem;
+  background-color: var(--app-bg-surface);
+  border-bottom: 1px solid var(--app-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.toc-option-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.toc-block-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--app-text-muted);
+}
+
+.toc-theme-swatches {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+}
+
+.toc-theme-btn {
+  background: var(--app-bg-tile);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-main);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.45rem 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+}
+
+.toc-theme-btn:hover {
+  background-color: var(--app-bg-tile-hover);
+  border-color: var(--app-border-focus);
+}
+
+.toc-theme-btn.active {
+  border-color: var(--app-purple-active);
+  background-color: rgba(94, 66, 166, 0.15);
+  color: var(--app-purple-active);
+  font-weight: 700;
+}
+
+.toc-theme-dot {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.theme-dot-dark {
+  background-color: #1a1a1f;
+  border: 1px solid #444;
+}
+
+.theme-dot-sepia {
+  background-color: #f4e6c7;
+  border: 1px solid #c4b59b;
+}
+
+.theme-dot-light {
+  background-color: #ffffff;
+  border: 1px solid #ccc;
+}
+
+.toc-font-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.toc-font-row .btn-reader-action {
+  flex: 1;
+  height: 34px;
+  font-size: 0.88rem;
+}
+
+.reader-font-indicator {
+  min-width: 52px;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--app-text-main);
+}
+
+.toc-chapters-label {
+  padding: 0.45rem 1rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--app-text-muted);
+  background-color: var(--app-bg-surface);
+  border-bottom: 1px solid var(--app-border-subtle);
+  flex-shrink: 0;
+}
+
+.chapters-list {
+  list-style: none;
+  overflow-y: auto;
+  flex: 1;
+  padding: 0.5rem 0;
+}
+
+.chapter-item {
+  padding: 0.8rem 1.25rem;
+  cursor: pointer;
+  font-size: 0.88rem;
+  color: var(--app-text-muted);
+  border-bottom: 1px solid var(--app-border-subtle);
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.chapter-item:hover {
+  background-color: var(--app-bg-tile-hover);
+  color: var(--app-text-main);
+}
+
+.chapter-item.active {
+  background-color: var(--app-bg-tile);
+  color: var(--app-text-main);
+  font-weight: 700;
+  border-left: 3px solid var(--app-purple-active);
+}
+
+/* Área de contenido del lector con espacio reservado para los botones inferiores */
+.reader-content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem 1.5rem calc(var(--reader-nav-height) + 2rem) 1.5rem;
+}
+
+.reader-paper {
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+.reader-book-lead {
+  border-bottom: 1px solid var(--app-border);
+  padding-bottom: 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+.reader-book-eyebrow {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--app-text-muted);
+  display: block;
+  margin-bottom: 0.35rem;
+  letter-spacing: 0.02em;
+}
+
+.reader-book-heading {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--app-purple-active);
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+.chapter-meta-tag {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--app-purple-active);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.4rem;
+}
+
+.chapter-headline {
+  font-size: 1.85rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--app-text-main);
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.markdown-article {
+  font-size: 1.12rem;
+  line-height: 1.8;
+  color: var(--app-text-main);
+}
+
+.markdown-article h1, .markdown-article h2, .markdown-article h3 {
+  margin: 2rem 0 1rem 0;
+  font-weight: 700;
+  color: var(--app-text-main);
+}
+
+.markdown-article p {
+  margin-bottom: 1.35rem;
+  color: var(--app-text-main);
+}
+
+.markdown-article blockquote {
+  border-left: 3px solid var(--app-purple-active);
+  padding: 0.75rem 1.25rem;
+  background-color: rgba(255, 255, 255, 0.04);
+  margin: 1.5rem 0;
+  color: var(--app-text-muted);
+}
+
+.code-box,
+.markdown-article pre,
+.wiki-modal pre,
+.reader-workspace pre {
+  background-color: var(--code-block-bg, #141416) !important;
+  color: var(--code-block-text, #f0f6fc) !important;
+  border: 1px solid var(--code-block-border, var(--app-border)) !important;
+  padding: 0.9rem 1.2rem !important;
+  overflow-x: auto !important;
+  margin: 1.25rem 0 !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.85rem !important;
+  line-height: 1.6 !important;
+}
+
+.code-box code,
+.markdown-article pre code,
+.wiki-modal pre code,
+.reader-workspace pre code {
+  background: transparent !important;
+  padding: 0 !important;
+  color: inherit !important;
+  font-family: inherit !important;
+  font-size: inherit !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.markdown-article :not(pre) > code,
+.wiki-card-step :not(pre) > code,
+p code, li code, td code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background-color: var(--code-inline-bg, rgba(255, 255, 255, 0.08)) !important;
+  color: var(--code-inline-text, var(--app-purple-light)) !important;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid rgba(155, 81, 224, 0.2);
+}
+
+.markdown-article table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  font-size: 0.88rem;
+  border: 1px solid var(--app-border);
+}
+
+.markdown-article th,
+.markdown-article td {
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--app-border);
+  text-align: left;
+}
+
+.markdown-article th {
+  background-color: var(--app-bg-surface);
+  color: var(--app-text-main);
+  font-weight: 700;
+}
+
+.markdown-article td {
+  background-color: var(--app-bg-tile);
+  color: var(--app-text-main);
+}
+
+.markdown-article hr {
+  border: none;
+  border-top: 1px solid var(--app-border);
+  margin: 2rem 0;
+}
+
+/* ==========================================================================
+   BOTONES ANTERIOR Y SIGUIENTE ABAJO DEL TODO (FIXED BOTTOM BAR EN MÓVIL)
+   ========================================================================== */
+.reader-nav-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--reader-nav-height);
+  background-color: var(--app-bg-surface);
+  border-top: 1px solid var(--app-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  gap: 0.75rem;
+  z-index: 100;
+  box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.35);
+  padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
+}
+
+.btn-page {
+  flex: 1;
+  height: 42px;
+  background-color: var(--app-bg-tile);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-main);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.btn-page:hover:not(:disabled) {
+  background-color: var(--app-bg-tile-hover);
+  border-color: var(--app-border-focus);
+}
+
+.btn-page.primary {
+  background-color: var(--app-purple-active);
+  border-color: var(--app-purple-active);
+  color: #ffffff;
+}
+
+.btn-page.primary:hover:not(:disabled) {
+  background-color: var(--app-purple-accent);
+}
+
+.btn-page:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.nav-text-short {
+  display: none;
+}
+
+/* ==========================================================================
+   9. MODALES OSCUROS (100% CUADRADOS)
+   ========================================================================== */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 1rem;
+}
+
+.modal-box {
+  background-color: var(--app-bg-surface);
+  border: 1px solid var(--app-border);
+  width: 100%;
+  max-width: 580px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.7);
+  animation: modalPop 0.18s ease-out;
+}
+
+.modal-box.modal-large {
+  max-width: 840px;
+}
+
+@keyframes modalPop {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.modal-header {
+  padding: 1.1rem 1.35rem;
+  border-bottom: 1px solid var(--app-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-header h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--app-text-main);
+}
+
+.wiki-subtitle {
+  font-size: 0.76rem;
+  color: var(--app-text-muted);
+  display: block;
+}
+
+.btn-close-modal, .btn-close-sheet {
+  background: none;
+  border: 1px solid transparent;
+  color: var(--app-text-main);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.btn-close-modal:hover, .btn-close-sheet:hover {
+  background-color: var(--app-bg-tile-hover);
+  border-color: var(--app-border);
+}
+
+.modal-body {
+  padding: 1.35rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-desc {
+  font-size: 0.88rem;
+  color: var(--app-text-muted);
+  margin-bottom: 1.25rem;
+  line-height: 1.5;
+}
+
+.drop-zone {
+  border: 2px dashed var(--app-border);
+  padding: 2.25rem 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  background-color: var(--app-bg-window);
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.drop-zone:hover, .drop-zone.dragover {
+  border-color: var(--app-purple-active);
+  background-color: var(--app-purple-bg);
+}
+
+.drop-icon {
+  color: var(--app-purple-active);
+  margin-bottom: 0.75rem;
+}
+
+.drop-zone h4 {
+  font-size: 1rem;
+  color: var(--app-text-main);
+  margin-bottom: 0.35rem;
+}
+
+.drop-zone p {
+  font-size: 0.8rem;
+  color: var(--app-text-muted);
+}
+
+.file-chosen-info {
+  margin-top: 1rem;
+  padding: 0.65rem;
+  background: var(--app-bg-tile);
+  border: 1px solid var(--app-border);
+  font-size: 0.85rem;
+  color: var(--app-text-main);
+}
+
+.upload-progress-container {
+  margin-top: 1.25rem;
+}
+
+.progress-bar-bg {
+  height: 6px;
+  background-color: #111111;
+  border: 1px solid var(--app-border);
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background-color: var(--app-purple-active);
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.76rem;
+  color: var(--app-text-muted);
+  margin-top: 0.4rem;
+  display: block;
+}
+
+.modal-footer {
+  padding: 1rem 1.35rem;
+  border-top: 1px solid var(--app-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.btn-primary {
+  background-color: var(--app-purple-active);
+  color: #ffffff;
+  border: 1px solid var(--app-purple-active);
+  padding: 0.55rem 1.25rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--app-purple-accent);
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--app-bg-tile);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-main);
+  padding: 0.55rem 1.1rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background-color: var(--app-bg-tile-hover);
+}
+
+.btn-danger {
+  background-color: var(--app-danger);
+  border: 1px solid var(--app-danger);
+  color: #ffffff;
+  padding: 0.55rem 1.15rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.btn-danger:hover {
+  background-color: #c0392b;
+}
+
+.modal-dialog {
+  max-width: 440px !important;
+}
+
+.delete-warning-text {
+  font-size: 0.95rem;
+  color: var(--app-text-main);
+  margin-bottom: 0.9rem;
+  line-height: 1.5;
+}
+
+.delete-book-target {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.75rem 0.9rem;
+  background-color: var(--app-bg-tile);
+  border: 1px solid var(--app-border);
+  margin-bottom: 0.9rem;
+}
+
+.delete-target-icon {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.delete-target-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--app-text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delete-sub-warning {
+  font-size: 0.78rem;
+  color: var(--app-text-muted);
+  line-height: 1.4;
+}
+
+/* Wiki Tabs */
+.wiki-tabs-bar {
+  display: flex;
+  padding: 0 0 0.5rem 0;
+  border-bottom: 1px solid var(--app-border);
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+  user-select: none;
+}
+
+.wiki-tab-chip {
+  background: none;
+  border: none;
+  color: var(--app-text-muted);
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 0.55rem 0.95rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.wiki-tab-chip:hover {
+  color: var(--app-text-main);
+}
+
+.wiki-tab-chip.active {
+  color: var(--app-text-main);
+  border-bottom-color: var(--app-purple-active);
+}
+
+.wiki-card-step {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.step-badge {
+  width: 28px;
+  height: 28px;
+  background-color: var(--app-purple-active);
+  color: #fff;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.9rem;
+}
+
+
+.rule-box {
+  background-color: var(--app-purple-bg);
+  border-left: 3px solid var(--app-purple-active);
+  padding: 0.85rem;
+  margin-top: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--app-text-main);
+}
+
+.template-actions-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.6rem;
+  font-weight: 600;
+  color: var(--app-text-main);
+}
+
+.btn-copy-template {
+  background: var(--app-bg-tile);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-main);
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Pestaña de Versión y GitHub en la Wiki */
+.version-release-hero {
+  background: var(--app-bg-tile);
+  border: 1px solid var(--app-border);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.version-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.version-tag {
+  background-color: var(--app-purple-active);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 0.2rem 0.6rem;
+  letter-spacing: 0.03em;
+}
+
+.version-status-pill,
+.version-license-pill {
+  background-color: var(--app-bg-tile-hover);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-main);
+  font-size: 0.74rem;
+  padding: 0.2rem 0.55rem;
+  font-weight: 500;
+}
+
+.version-app-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--app-text-main);
+  margin-bottom: 0.35rem;
+}
+
+.version-tagline {
+  font-size: 0.88rem;
+  color: var(--app-text-muted);
+  line-height: 1.4;
+}
+
+.version-download-box {
+  background: var(--app-bg-tile);
+  border: 1px solid var(--app-border);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.version-download-box h4 {
+  font-size: 0.95rem;
+  color: var(--app-text-main);
+  margin-bottom: 0.4rem;
+}
+
+.version-download-box p {
+  font-size: 0.85rem;
+  color: var(--app-text-muted);
+  margin-bottom: 1rem;
+}
+
+.version-actions-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.btn-github-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-decoration: none;
+  background-color: var(--app-bg-tile-hover);
+  color: var(--app-text-main);
+  border: 1px solid var(--app-border);
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn-github-action:hover {
+  background-color: var(--app-border);
+  border-color: var(--app-border-strong);
+  color: #fff;
+}
+
+.btn-github-action.primary {
+  background-color: var(--app-purple-active);
+  border-color: var(--app-purple-active);
+  color: #fff;
+}
+
+.btn-github-action.primary:hover {
+  background-color: var(--app-purple-accent);
+  border-color: var(--app-purple-accent);
+}
+
+.alert-message {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--app-border);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  font-weight: 500;
+}
+
+.alert-message.error {
+  background-color: rgba(231, 76, 60, 0.15);
+  border-color: rgba(231, 76, 60, 0.5);
+  color: #ff9999;
+}
+
+.alert-message.success {
+  background-color: rgba(46, 204, 113, 0.15);
+  border-color: rgba(46, 204, 113, 0.5);
+  color: #a3e635;
+}
+
+.backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 15;
+}
+
+/* ==========================================================================
+   10. RESPONSIVE / ADAPTACIONES MÓVIL Y TABLET
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .category-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .mobile-hide {
+    display: none !important;
+  }
+
+  /* Reducir el texto de los botones en móvil para mostrar únicamente el símbolo */
+  .btn-reader-back .btn-text,
+  .btn-topbar-nav .btn-text,
+  .btn-topbar-upload .btn-text {
+    display: none !important;
+  }
+
+  .btn-reader-back,
+  .btn-topbar-nav {
+    padding: 0.45rem 0.65rem !important;
+    gap: 0 !important;
+  }
+
+  .btn-topbar-upload {
+    padding: 0.35rem 0.5rem !important;
+    gap: 0 !important;
+    height: 32px !important;
+  }
+
+  .category-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .books-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem 0.85rem;
+  }
+
+  .topbar-left, .topbar-right {
+    min-width: 48px;
+  }
+
+  /* Ocultar el título de la barra en móvil para evitar que se rompa */
+  .reader-header-info {
+    display: none !important;
+  }
+
+  /* Ocultar opciones de lectura y colores de la barra superior en móvil (se colocan en el sidebar) */
+  .reader-topbar .theme-switchers-compact,
+  .reader-topbar #font-decrease,
+  .reader-topbar #font-increase {
+    display: none !important;
+  }
+
+  .reader-quick-actions {
+    gap: 0.25rem;
+  }
+
+  /* El sidebar drawer en móvil ocupa toda la altura y se posiciona por encima */
+  .reader-toc-sheet {
+    width: 310px;
+    max-width: 86vw;
+    bottom: 0 !important;
+    z-index: 120 !important;
+  }
+
+  .backdrop#reader-toc-backdrop {
+    z-index: 115 !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .category-grid {
+    grid-template-columns: 1fr; /* 1 columna cómoda y táctil en móviles */
+  }
+
+  .books-container {
+    grid-template-columns: repeat(2, 1fr); /* Exactamente de 2 en 2 en móvil */
+    gap: 1rem 0.65rem;
+  }
+
+  .book-cover-title-emboss {
+    font-size: 0.8rem;
+    padding: 0.2rem;
+  }
+
+  .book-title-label {
+    font-size: 0.78rem;
+    margin-top: 0.45rem;
+  }
+
+  .category-tile {
+    padding: 0.95rem 1.15rem;
+    gap: 0.95rem;
+    min-height: 64px;
+  }
+
+  .tile-title {
+    font-size: 0.95rem;
+  }
+
+  .header-main-title {
+    font-size: 0.98rem;
+  }
+
+  .subtab-btn {
+    padding: 0 0.85rem;
+    font-size: 0.74rem;
+  }
+
+  .reader-content-scroll {
+    padding: 1.25rem 1rem calc(var(--reader-nav-height) + 1.5rem) 1rem;
+  }
+
+  .btn-page {
+    font-size: 0.82rem;
+  }
+
+  .nav-text-full {
+    display: none;
+  }
+
+  .nav-text-short {
+    display: inline;
+  }
+}
+
+.hidden {
+  display: none !important;
+}

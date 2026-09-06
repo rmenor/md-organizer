@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Fondo 100% negro puro, sin bordes ni textos -->
+  <rect width="512" height="512" fill="#000000" />
+
+  <!-- Libro 1: Rojo (#ff5f56) Proporción exacta 4:5 (96x120) -->
+  <g transform="translate(56, 196)">
+    <rect x="0" y="0" width="96" height="120" rx="16" fill="#ff5f56" />
+    <line x1="20" y1="6" x2="20" y2="114" stroke="#ffffff" stroke-opacity="0.45" stroke-width="6" stroke-linecap="round" />
+    <rect x="30" y="98" width="54" height="12" rx="3" fill="#18191c" fill-opacity="0.75" />
+    <text x="58" y="68" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', monospace" font-size="44" font-weight="900" fill="#ffffff" text-anchor="middle">#</text>
+  </g>
+
+  <!-- Libro 2: Amarillo (#ffbd2e) Proporción exacta 4:5 (96x120) -->
+  <g transform="translate(208, 196)">
+    <rect x="0" y="0" width="96" height="120" rx="16" fill="#ffbd2e" />
+    <line x1="20" y1="6" x2="20" y2="114" stroke="#ffffff" stroke-opacity="0.45" stroke-width="6" stroke-linecap="round" />
+    <rect x="30" y="98" width="54" height="12" rx="3" fill="#18191c" fill-opacity="0.75" />
+    <text x="58" y="68" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', monospace" font-size="44" font-weight="900" fill="#ffffff" text-anchor="middle">#</text>
+  </g>
+
+  <!-- Libro 3: Verde (#27c93f) Proporción exacta 4:5 (96x120) -->
+  <g transform="translate(360, 196)">
+    <rect x="0" y="0" width="96" height="120" rx="16" fill="#27c93f" />
+    <line x1="20" y1="6" x2="20" y2="114" stroke="#ffffff" stroke-opacity="0.45" stroke-width="6" stroke-linecap="round" />
+    <rect x="30" y="98" width="54" height="12" rx="3" fill="#18191c" fill-opacity="0.75" />
+    <text x="58" y="68" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', monospace" font-size="44" font-weight="900" fill="#ffffff" text-anchor="middle">#</text>
+  </g>
+</svg>

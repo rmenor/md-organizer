@@ -1,0 +1,38 @@
+{
+  "name": "md-organizer",
+  "version": "1.0.0",
+  "description": "Self-hosted, distraction-free digital library and web reader for Markdown books and documentation with version control.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/test_app.js",
+    "generate-samples": "node examples/generate_samples.js",
+    "seed": "node -e \"const { processZipFile } = require('./src/processor'); const path = require('path'); (async () => { await processZipFile(path.join('examples', '1_libro_codigo_limpio_v1.zip'), '1_libro_codigo_limpio_v1.zip'); await processZipFile(path.join('examples', '4_sqlite_guia_auto.zip'), '4_sqlite_guia_auto.zip'); await processZipFile(path.join('examples', '5_especificacion_mdz_book.mdz'), '5_especificacion_mdz_book.mdz'); console.log('📚 Biblioteca inicializada con libros de ejemplo (.zip y .mdz).'); })();\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rmenor/md-organizer.git"
+  },
+  "homepage": "https://md-organizer.vercel.app/",
+  "keywords": [
+    "markdown",
+    "reader",
+    "digital-library",
+    "ebook-reader",
+    "documentation",
+    "self-hosted",
+    "sqlite",
+    "knowledge-base",
+    "books",
+    "reading-app",
+    "distraction-free"
+  ],
+  "author": "Ramón Menor",
+  "license": "MIT",
+  "dependencies": {
+    "adm-zip": "^0.6.0",
+    "better-sqlite3": "^13.0.3",
+    "express": "^5.2.1",
+    "multer": "^2.3.0"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "code": "BK-SQLITE-EMB",
+  "title": "Introducción a SQLite y Sistemas Embebidos",
+  "author": "Richard Hipp",
+  "version": "1.2.0",
+  "date": "2024-08-20",
+  "publication_date": "2024-08-20",
+  "description": "",
+  "section": "Bases_de_Datos",
+  "subsection": "SQLite",
+  "cover": "",
+  "language": "es",
+  "updated_at": "2026-09-05T23:51:22.117Z",
+  "chapters": [
+    {
+      "order": 1,
+      "title": "Introducción a SQLite y Sistemas Embebidos",
+      "file": "01_01_introduccion.md",
+      "words": 34
+    }
+  ]
+}

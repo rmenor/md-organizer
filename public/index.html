@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Biblioteca - Libros Markdown</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/css/styles.css?v=11">
+</head>
+<body class="theme-dark">
+  <!-- CABECERA SUPERIOR -->
+  <header class="app-topbar">
+    <div class="topbar-left">
+      <div class="window-decor mobile-hide" id="brand-decor" title="MD Organizer" role="button" tabindex="0" aria-label="Ir a la biblioteca">
+        <svg class="decor-book book-red" width="13" height="16" viewBox="0 0 13 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0.5" y="0.5" width="12" height="15" rx="2" fill="#ff5f56"/>
+          <path d="M3.2 1v14" stroke="#ffffff" stroke-opacity="0.45" stroke-width="0.8"/>
+          <rect x="4.5" y="13.2" width="7" height="1.6" rx="0.5" fill="#18191c" fill-opacity="0.6"/>
+          <text x="7.8" y="8.5" font-family="monospace" font-size="5.5" font-weight="900" fill="#ffffff" fill-opacity="0.85" text-anchor="middle">#</text>
+        </svg>
+        <svg class="decor-book book-yellow" width="13" height="16" viewBox="0 0 13 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0.5" y="0.5" width="12" height="15" rx="2" fill="#ffbd2e"/>
+          <path d="M3.2 1v14" stroke="#ffffff" stroke-opacity="0.45" stroke-width="0.8"/>
+          <rect x="4.5" y="13.2" width="7" height="1.6" rx="0.5" fill="#18191c" fill-opacity="0.6"/>
+          <text x="7.8" y="8.5" font-family="monospace" font-size="5.5" font-weight="900" fill="#ffffff" fill-opacity="0.85" text-anchor="middle">#</text>
+        </svg>
+        <svg class="decor-book book-green" width="13" height="16" viewBox="0 0 13 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0.5" y="0.5" width="12" height="15" rx="2" fill="#27c93f"/>
+          <path d="M3.2 1v14" stroke="#ffffff" stroke-opacity="0.45" stroke-width="0.8"/>
+          <rect x="4.5" y="13.2" width="7" height="1.6" rx="0.5" fill="#18191c" fill-opacity="0.6"/>
+          <text x="7.8" y="8.5" font-family="monospace" font-size="5.5" font-weight="900" fill="#ffffff" fill-opacity="0.85" text-anchor="middle">#</text>
+        </svg>
+      </div>
+      <button class="btn-topbar-nav hidden" id="btn-back-to-grid" title="Volver al catálogo principal">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        <span class="btn-text">Atrás</span>
+      </button>
+    </div>
+
+    <!-- Título Principal y Subtítulo Central -->
+    <div class="topbar-center">
+      <h1 class="header-main-title" id="topbar-title">Biblioteca</h1>
+      <span class="header-sub-title" id="topbar-subtitle">Español</span>
+    </div>
+
+    <!-- Acciones en el extremo derecho -->
+    <div class="topbar-right">
+      <button class="btn-topbar-upload" id="btn-topbar-upload" aria-label="Subir libro" title="Subir libro (.ZIP)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+        <span class="btn-text">Subir</span>
+      </button>
+
+      <button class="btn-top-icon" id="btn-search-toggle" aria-label="Buscar publicaciones" title="Buscar publicaciones">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </button>
+
+      <button class="btn-top-icon" id="btn-lang-toggle" aria-label="Cambiar tema / idioma" title="Tema e idiomas">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+          <path d="M7 15h10"></path>
+          <path d="M12 9v6"></path>
+        </svg>
+      </button>
+
+      <button class="btn-top-icon" id="btn-history-toggle" aria-label="Historial y Actualizaciones" title="Historial y Actualizaciones">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+          <path d="M3 3v5h5"></path>
+          <polyline points="12 7 12 12 15 15"></polyline>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- BARRA DE PESTAÑAS SUB-NAV -->
+  <nav class="app-subtabs" aria-label="Categorías principales">
+    <div class="subtabs-scroll">
+      <button class="subtab-btn active" data-tab="publications" id="tab-btn-publications">
+        <span>PUBLICACIONES</span>
+      </button>
+      <button class="subtab-btn" data-tab="wiki" id="tab-btn-wiki">
+        <span>GUÍA &amp; WIKI</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- BUSCADOR DESPLEGABLE RÁPIDO -->
+  <div class="search-drawer hidden" id="search-drawer">
+    <div class="search-drawer-inner">
+      <svg class="drawer-search-ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input type="text" id="global-search-input" placeholder="Buscar por título, autor, código de libro o tema..." autocomplete="off">
+      <button class="btn-clear-search hidden" id="btn-clear-search">✕</button>
+      <button class="btn-close-search" id="btn-close-search">Cerrar</button>
+    </div>
+  </div>
+
+  <!-- BACKDROP COMÚN -->
+  <div class="backdrop hidden" id="app-backdrop"></div>
+
+  <!-- VISTA PRINCIPAL: BIBLIOTECA -->
+  <main id="library-view" class="view active">
+    <!-- 1. CUADRÍCULA DE CATEGORÍAS -->
+    <section class="grid-container" id="category-view">
+      <div class="category-grid" id="category-tiles-grid">
+        <!-- Baldosa: Libros -->
+        <div class="category-tile" data-action="filter-all" tabindex="0">
+          <div class="tile-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"></path>
+              <path d="M6 6h10"></path>
+              <path d="M6 10h10"></path>
+            </svg>
+          </div>
+          <div class="tile-info">
+            <span class="tile-title">Libros</span>
+            <span class="tile-meta" id="tile-books-count">0 disponibles</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. VISTA DETALLADA DE LIBROS Y PUBLICACIONES -->
+    <section class="publications-view hidden" id="publications-view">
+
+      <!-- Lista de Libros en tarjetas -->
+      <div class="books-container" id="books-container">
+        <!-- Renderizado dinámicamente -->
+      </div>
+
+      <!-- Estado vacío -->
+      <div class="empty-state hidden" id="empty-state">
+        <div class="empty-icon">📚</div>
+        <h3>No hay publicaciones en esta categoría</h3>
+        <p>Sube un archivo <code>.zip</code> o <code>.mdz</code> con documentos Markdown para organizarlo automáticamente en tu biblioteca.</p>
+        <button class="btn-primary" id="btn-empty-upload">Subir Libro (.ZIP / .MDZ)</button>
+      </div>
+    </section>
+
+    <!-- 4. VISTA DE ACTUALIZACIONES Y VERSIONES -->
+    <section class="updates-view hidden" id="updates-view">
+      <div class="updates-view-header">
+        <h2>Historial y Control de Versiones</h2>
+        <p>Gestión inteligente de versiones: los libros entrantes con fecha superior sustituyen la versión anterior; las versiones inferiores son advertidas para evitar pérdidas.</p>
+      </div>
+      <div class="updates-cards-container" id="updates-cards-container">
+        <!-- Lista de versiones activas -->
+      </div>
+    </section>
+
+    <!-- 5. VISTA PRINCIPAL: GUÍA & WIKI -->
+    <section class="wiki-view hidden" id="wiki-view">
+      <div class="wiki-view-header">
+        <div class="wiki-header-title">
+          <h2>Guía: Cómo Crear y Comprimir Libros Markdown</h2>
+          <p class="wiki-subtitle">Instrucciones, especificación de paquetes y herramientas para preparar tus publicaciones</p>
+        </div>
+      </div>
+
+      <div class="wiki-tabs-bar">
+        <button class="wiki-tab-chip active" data-wiki-tab="guide">Guía Rápida</button>
+        <button class="wiki-tab-chip" data-wiki-tab="template">Plantilla metadata.json</button>
+        <button class="wiki-tab-chip" data-wiki-tab="full">Documentación Completa</button>
+        <button class="wiki-tab-chip" data-wiki-tab="version">Versión &amp; GitHub</button>
+      </div>
+
+      <div class="wiki-view-body">
+        <!-- Pestaña 1: Guía Rápida -->
+        <div class="wiki-pane active" id="pane-guide">
+          <div class="wiki-card-step">
+            <div class="step-badge">1</div>
+            <div>
+              <h4>Estructura de Carpetas Recomendada</h4>
+              <p>Organiza tus capítulos Markdown de forma secuencial y crea una carpeta <code>assets/</code> para imágenes:</p>
+              <pre class="code-box">mi-libro/
+├── metadata.json                 (Opcional pero recomendado)
+├── 01_introduccion.md
+├── 02_fundamentos.md
+└── assets/
+    └── cover.png</pre>
+            </div>
+          </div>
+
+          <div class="wiki-card-step">
+            <div class="step-badge">2</div>
+            <div>
+              <h4>Control de Versiones y Código</h4>
+              <p>Cada libro debe incluir en su <code>metadata.json</code> o encabezado YAML los campos:</p>
+              <ul>
+                <li><strong>code</strong>: Identificador único del libro (ej: <code>BK-CLEAN-CODE</code>).</li>
+                <li><strong>version</strong>: Versión semántica (ej: <code>1.0.0</code>).</li>
+                <li><strong>date</strong>: Fecha de publicación (ej: <code>2024-01-15</code>).</li>
+              </ul>
+              <div class="rule-box">
+                <strong>Regla de sustitución automática:</strong> Si subes un libro con el mismo <code>code</code> y fecha posterior, se sustituirá automáticamente. Si la fecha es anterior o igual, la aplicación avisará que ya está instalada una versión superior.
+              </div>
+            </div>
+          </div>
+
+          <div class="wiki-card-step">
+            <div class="step-badge">3</div>
+            <div>
+              <h4>Compresión en ZIP</h4>
+              <p>Comprime el <strong>contenido</strong> de la carpeta (no la carpeta contenedora externa), de modo que <code>metadata.json</code> o el primer fichero Markdown quede en la raíz del ZIP.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pestaña 2: Plantilla metadata.json -->
+        <div class="wiki-pane hidden" id="pane-template">
+          <div class="template-actions-bar">
+            <span>Plantilla oficial recomendada:</span>
+            <button class="btn-copy-template" id="btn-copy-template">Copiar Plantilla</button>
+          </div>
+          <pre class="code-box json-code" id="json-template-code">{
+  "code": "BK-GUIA-PRACTICA",
+  "version": "1.0.0",
+  "date": "2024-01-15",
+  "title": "Título de la Publicación",
+  "author": "Nombre del Autor",
+  "description": "Breve sinopsis de la obra.",
+  "section": "Ingeniería de Software",
+  "subsection": "Buenas Prácticas",
+  "language": "es",
+  "cover": "assets/cover.png",
+  "chapters": [
+    { "title": "Capítulo 1: Introducción", "file": "01_introduccion.md" },
+    { "title": "Capítulo 2: Conceptos Clave", "file": "02_conceptos.md" }
+  ]
+}</pre>
+        </div>
+
+        <!-- Pestaña 3: Documentación Completa -->
+        <div class="wiki-pane hidden" id="pane-full">
+          <div class="markdown-article wiki-markdown-view" id="wiki-markdown-container">
+            <p style="color: var(--app-text-muted);">Cargando documentación completa...</p>
+          </div>
+        </div>
+
+        <!-- Pestaña 4: Versión & Descarga GitHub -->
+        <div class="wiki-pane hidden" id="pane-version">
+          <div class="version-release-hero">
+            <div class="version-hero-info">
+              <div class="version-badge-row">
+                <span class="version-tag">v1.0.0</span>
+                <span class="version-status-pill">Release Oficial</span>
+                <span class="version-license-pill">Licencia MIT</span>
+              </div>
+              <h3 class="version-app-title">MD Organizer (Athenaeum)</h3>
+              <p class="version-tagline">Organizador de libros Markdown y biblioteca digital autocontenida de código abierto.</p>
+            </div>
+          </div>
+
+          <div class="version-download-box">
+            <h4>📦 Código Fuente y Descarga</h4>
+            <p>El código fuente completo de este proyecto está disponible públicamente en GitHub. Puedes clonarlo, descargarlo en formato .ZIP o contribuir con mejoras:</p>
+            <div class="version-actions-grid">
+              <a href="https://github.com/rmenor/md-organizer" target="_blank" rel="noopener noreferrer" class="btn-github-action primary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+                </svg>
+                <span>Ver en GitHub</span>
+              </a>
+              <a href="https://github.com/rmenor/md-organizer/archive/refs/heads/main.zip" target="_blank" rel="noopener noreferrer" class="btn-github-action">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>Descargar Código (.ZIP)</span>
+              </a>
+              <a href="/examples/5_especificacion_mdz_book.mdz" download class="btn-github-action">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>Descargar Ejemplo (.MDZ)</span>
+              </a>
+              <a href="https://github.com/rmenor/md-organizer/stargazers" target="_blank" rel="noopener noreferrer" class="btn-github-action">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                </svg>
+                <span>Dar Estrella ⭐</span>
+              </a>
+            </div>
+          </div>
+
+          <div class="wiki-card-step">
+            <div class="step-badge">🚀</div>
+            <div>
+              <h4>Ejecución Local en 60 Segundos</h4>
+              <p>Puedes ejecutar tu propia instancia local en tu ordenador o servidor con Node.js:</p>
+              <pre class="code-box">git clone https://github.com/rmenor/md-organizer.git
+cd md-organizer
+npm install
+npm start</pre>
+              <p style="margin-top: 0.5rem; font-size: 0.84rem; color: var(--app-text-muted);">
+                Abre <code>http://localhost:3000</code> en tu navegador web.
+              </p>
+            </div>
+          </div>
+
+          <div class="wiki-card-step">
+            <div class="step-badge">✨</div>
+            <div>
+              <h4>Características de la Versión v1.0.0</h4>
+              <ul style="padding-left: 1.2rem; font-size: 0.84rem; color: var(--app-text-main); line-height: 1.75; margin-top: 0.4rem;">
+                <li><strong>Ingesta de Libros ZIP:</strong> Extracción segura e indexación de capítulos Markdown en SQLite.</li>
+                <li><strong>Motor de Control de Versiones:</strong> Detección automática de códigos de libro y sustitución de versiones más recientes.</li>
+                <li><strong>Lector Tipográfico Multitema:</strong> Modos Oscuro, Sepia y Claro, paginación fluida, ajuste de fuentes y visor TOC.</li>
+                <li><strong>Cuadrícula Dinámica de Secciones:</strong> Generación automática de baldosas según las categorías de los libros.</li>
+                <li><strong>Despliegue Serverless en Vercel:</strong> Configuración optimizada con redirección a <code>/tmp</code> para entornos efímeros.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- LECTOR MARKDOWN COMPLETO (DARK E-READER) -->
+  <section id="reader-view" class="view reader-view hidden">
+    <!-- Barra superior del Lector -->
+    <header class="reader-topbar">
+      <button class="btn-reader-back" id="btn-close-reader" title="Volver a la biblioteca">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        <span class="btn-text">Biblioteca</span>
+      </button>
+
+      <div class="reader-header-info">
+        <h2 id="reader-book-title">Título del Libro</h2>
+      </div>
+
+      <div class="reader-quick-actions">
+        <!-- Selector de tema e iluminación -->
+        <div class="theme-switchers-compact">
+          <button class="btn-theme-dot active" data-theme="dark" title="Modo Oscuro"></button>
+          <button class="btn-theme-dot theme-dot-sepia" data-theme="sepia" title="Modo Sepia"></button>
+          <button class="btn-theme-dot theme-dot-light" data-theme="light" title="Modo Claro"></button>
+        </div>
+
+        <!-- Ajuste de tipografía -->
+        <button class="btn-reader-action" id="font-decrease" title="Reducir tamaño de letra">A-</button>
+        <button class="btn-reader-action" id="font-increase" title="Aumentar tamaño de letra">A+</button>
+
+        <!-- Botón para abrir índice de capítulos -->
+        <button class="btn-reader-toc" id="btn-toggle-toc" title="Índice de capítulos" aria-label="Abrir capítulos">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Workspace del Lector -->
+    <div class="backdrop hidden" id="reader-toc-backdrop"></div>
+    <div class="reader-workspace">
+      <!-- Drawer de Capítulos -->
+      <aside class="reader-toc-sheet" id="reader-toc" aria-label="Capítulos">
+        <div class="toc-sheet-header">
+          <div class="toc-header-meta">
+            <h3>Contenido y Opciones</h3>
+            <span id="reader-chapter-progress" class="toc-progress-pill">Cap. 1</span>
+          </div>
+          <button class="btn-close-sheet" id="btn-close-toc" aria-label="Cerrar capítulos y opciones">✕</button>
+        </div>
+
+        <!-- Opciones de Lectura y Apariencia en el Sidebar -->
+        <div class="toc-reading-options">
+          <div class="toc-option-block">
+            <span class="toc-block-label">Tema de Lectura</span>
+            <div class="toc-theme-swatches">
+              <button class="toc-theme-btn active" data-theme="dark" title="Modo Oscuro">
+                <span class="toc-theme-dot theme-dot-dark"></span>
+                <span>Oscuro</span>
+              </button>
+              <button class="toc-theme-btn" data-theme="sepia" title="Modo Sepia">
+                <span class="toc-theme-dot theme-dot-sepia"></span>
+                <span>Sepia</span>
+              </button>
+              <button class="toc-theme-btn" data-theme="light" title="Modo Claro">
+                <span class="toc-theme-dot theme-dot-light"></span>
+                <span>Claro</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="toc-option-block">
+            <span class="toc-block-label">Tamaño de Letra</span>
+            <div class="toc-font-row">
+              <button class="btn-reader-action btn-font-dec" id="sidebar-font-decrease" title="Reducir tamaño de letra">A-</button>
+              <span class="reader-font-indicator" id="sidebar-font-indicator">100%</span>
+              <button class="btn-reader-action btn-font-inc" id="sidebar-font-increase" title="Aumentar tamaño de letra">A+</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="toc-chapters-label">
+          <span>Capítulos</span>
+        </div>
+        <ul id="reader-chapters-list" class="chapters-list">
+          <!-- Capítulos generados dinámicamente -->
+        </ul>
+      </aside>
+
+      <!-- Cuerpo del Lector tipográfico -->
+      <article class="reader-content-scroll">
+        <div class="reader-paper">
+          <div class="reader-book-lead">
+            <h2 class="reader-book-heading" id="reader-book-title-paper">Título del Libro</h2>
+          </div>
+          <div class="chapter-meta-tag" id="reader-current-badge">Capítulo 1</div>
+          <h1 id="reader-chapter-title" class="chapter-headline">Cargando...</h1>
+
+          <div id="reader-content" class="markdown-article">
+            <!-- Contenido Markdown -->
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <!-- Paginación de navegación de capítulos (anclada abajo del todo) -->
+    <nav class="reader-nav-footer">
+      <button class="btn-page" id="btn-prev-chapter" disabled>
+        <span class="nav-arrow">←</span>
+        <span class="nav-text-full">Anterior</span>
+        <span class="nav-text-short">Ant.</span>
+      </button>
+      <button class="btn-page primary" id="btn-next-chapter">
+        <span class="nav-text-full">Siguiente</span>
+        <span class="nav-text-short">Sig.</span>
+        <span class="nav-arrow">→</span>
+      </button>
+    </nav>
+  </section>
+
+  <!-- MODAL DE SUBIDA ZIP / MDZ -->
+  <div class="modal-backdrop hidden" id="upload-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Importar Publicación (.ZIP / .MDZ)</h3>
+        <button class="btn-close-modal" id="btn-close-modal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="modal-desc">
+          Selecciona un archivo <code>.zip</code> o <code>.mdz</code> con documentos Markdown. Compatible con la especificación <strong>MDZ Book Profile</strong> (con <code>manifest.json</code> y <code>metadata/book.json</code>) y formato directo (con <code>metadata.json</code> o inferencia automática).
+        </p>
+
+        <div class="drop-zone" id="drop-zone">
+          <div class="drop-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+          </div>
+          <h4>Haz clic o arrastra un archivo ZIP o MDZ aquí</h4>
+          <p>Formatos permitidos: .zip, .mdz (especificación MDZ o metadatos estándar)</p>
+          <div style="margin-top: 0.6rem;">
+            <a href="/examples/5_especificacion_mdz_book.mdz" download class="btn-sample-download" style="font-size: 0.82rem; color: #818cf8; text-decoration: none; border-bottom: 1px dashed #818cf8; padding-bottom: 1px;" onclick="event.stopPropagation();">
+              📥 Descargar paquete de ejemplo para probar (.mdz)
+            </a>
+          </div>
+          <input type="file" id="zip-file-input" accept=".zip,.mdz,application/zip,application/x-zip-compressed,application/octet-stream" class="hidden">
+          <div class="file-chosen-info hidden" id="file-chosen-info">
+            <span id="chosen-file-name" class="chosen-name"></span>
+            <span id="chosen-file-size" class="chosen-size"></span>
+          </div>
+        </div>
+
+        <div class="upload-progress-container hidden" id="upload-progress">
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="progress-bar-fill"></div>
+          </div>
+          <span class="progress-text" id="progress-text">Procesando y extrayendo capítulos...</span>
+        </div>
+
+        <div class="alert-message hidden" id="modal-alert"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btn-cancel-upload">Cancelar</button>
+        <button class="btn-primary" id="btn-submit-upload" disabled>Importar Publicación</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE CONFIRMACIÓN DE ELIMINACIÓN -->
+  <div class="modal-backdrop hidden" id="delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+    <div class="modal-box modal-dialog">
+      <div class="modal-header">
+        <h3 id="delete-modal-title">Eliminar Publicación</h3>
+        <button class="btn-close-modal" id="btn-close-delete-modal" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="delete-warning-text">¿Estás seguro de que deseas eliminar esta publicación de tu biblioteca?</p>
+        <div class="delete-book-target">
+          <span class="delete-target-icon">📕</span>
+          <span class="delete-target-title" id="delete-modal-book-title">Título del libro</span>
+        </div>
+        <p class="delete-sub-warning">Esta acción no se puede deshacer y se borrarán todos sus capítulos y recursos asociados.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btn-cancel-delete">Cancelar</button>
+        <button class="btn-danger" id="btn-confirm-delete">Eliminar Libro</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPTS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="/js/reader.js?v=11"></script>
+  <script src="/js/app.js?v=17"></script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Node.js (v20+), Express 5, better-sqlite3, multer, adm-zip, vanilla JS/CSS frontend
+  Architecture: Modular Express server (server.js, src/db.js, src/processor.js), SQLite database (library.db), static frontend in public/, ZIP processing and book versioning
+  Testing: Built-in Node test runner (node --test tests/test_app.js)
+  Conventions: CommonJS modules, SQLite WAL mode, atomic database transactions, strict validation for ZIP book uploads and metadata
+
+strict_tdd: true
+
+testing:
+  strict_tdd: true
+  detected: 2026-09-05
+  runner:
+    command: "npm test"
+    framework: "node:test"
+  runner_command: "npm test"
+  layers:
+    unit:
+      available: true
+      tool: "node:test + node:assert"
+    integration:
+      available: true
+      tool: "node:test + better-sqlite3 in-memory/temp database"
+    e2e:
+      available: false
+      tool: null
+  coverage:
+    available: false
+    command: null
+  quality:
+    linter:
+      available: false
+      command: null
+    type_checker:
+      available: false
+      command: null
+    formatter:
+      available: false
+      command: null
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Identify affected modules/packages
+  specs:
+    - Use Given/When/Then format for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group tasks by phase (infrastructure, implementation, testing)
+    - Use hierarchical numbering (1.1, 1.2, etc.)
+    - Keep tasks small enough to complete in one session
+  apply:
+    - Follow existing CommonJS and modular patterns
+    - Maintain database integrity with atomic transactions
+    tdd: true
+    test_command: "npm test"
+  verify:
+    test_command: "npm test"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas

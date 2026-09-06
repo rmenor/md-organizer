@@ -1,0 +1,34 @@
+{
+  "code": "BK-MDZ-SPEC",
+  "title": "Especificación MDZ y Perfil de Libros",
+  "author": "Markdown Packaging Working Group",
+  "version": "1.0.0",
+  "date": "2026-09-06",
+  "publication_date": "2026-09-06",
+  "description": "Especificación abierta de empaquetado y distribución portable de publicaciones Markdown versionadas (MDZ Book Profile).",
+  "section": "Arquitectura",
+  "subsection": "Estándares Web",
+  "cover": "assets/cover.png",
+  "language": "es",
+  "updated_at": "2026-09-05T23:51:41.663Z",
+  "chapters": [
+    {
+      "order": 1,
+      "title": "1. Manifiesto y Filosofía MDZ",
+      "file": "01_01_manifiesto_y_filosofia.md",
+      "words": 78
+    },
+    {
+      "order": 2,
+      "title": "2. Perfil de Libros y Capítulos",
+      "file": "02_02_perfil_de_libros.md",
+      "words": 46
+    },
+    {
+      "order": 3,
+      "title": "3. Interoperabilidad con Editores y CI/CD",
+      "file": "03_03_interoperabilidad.md",
+      "words": 44
+    }
+  ]
+}
