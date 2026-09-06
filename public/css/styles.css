@@ -46,6 +46,11 @@
 
   /* Dimensiones */
   --topbar-height: 52px;
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --topbar-total-height: calc(var(--topbar-height) + var(--safe-area-inset-top));
   --subtabs-height: 44px;
   --reader-nav-height: 60px;
 }
@@ -117,13 +122,13 @@ body {
    1. CABECERA SUPERIOR (TOPBAR MODERNO)
    ========================================================================== */
 .app-topbar {
-  height: var(--topbar-height);
+  height: var(--topbar-total-height);
   background-color: var(--app-bg-surface);
   border-bottom: 1px solid var(--app-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1rem;
+  padding: var(--safe-area-inset-top) calc(1rem + var(--safe-area-inset-right)) 0 calc(1rem + var(--safe-area-inset-left));
   position: sticky;
   top: 0;
   z-index: 50;
@@ -275,7 +280,7 @@ body {
   border-bottom: 1px solid var(--app-border);
   height: var(--subtabs-height);
   position: sticky;
-  top: var(--topbar-height);
+  top: var(--topbar-total-height);
   z-index: 40;
   width: 100%;
   max-width: 100vw;
@@ -295,7 +300,7 @@ body {
   display: inline-flex;
   align-items: stretch;
   height: 100%;
-  padding: 0 0.5rem;
+  padding: 0 calc(0.5rem + var(--safe-area-inset-right)) 0 calc(0.5rem + var(--safe-area-inset-left));
   white-space: nowrap;
   width: max-content;
   min-width: 100%;
@@ -347,9 +352,9 @@ body {
 .search-drawer {
   background-color: var(--app-bg-surface);
   border-bottom: 1px solid var(--app-border);
-  padding: 0.65rem 1rem;
+  padding: 0.65rem calc(1rem + var(--safe-area-inset-right)) 0.65rem calc(1rem + var(--safe-area-inset-left));
   position: sticky;
-  top: calc(var(--topbar-height) + var(--subtabs-height));
+  top: calc(var(--topbar-total-height) + var(--subtabs-height));
   z-index: 35;
   animation: slideDown 0.15s ease-out;
 }
@@ -930,13 +935,13 @@ body {
 }
 
 .reader-topbar {
-  height: var(--topbar-height);
+  height: var(--topbar-total-height);
   background-color: var(--app-bg-surface);
   border-bottom: 1px solid var(--app-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1rem;
+  padding: var(--safe-area-inset-top) calc(1rem + var(--safe-area-inset-right)) 0 calc(1rem + var(--safe-area-inset-left));
   flex-shrink: 0;
   z-index: 10;
 }
@@ -1046,7 +1051,7 @@ body {
   position: absolute;
   top: 0;
   left: 0;
-  bottom: var(--reader-nav-height);
+  bottom: calc(var(--reader-nav-height) + var(--safe-area-inset-bottom));
   z-index: 20;
   transform: translateX(-100%);
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1222,7 +1227,7 @@ body {
 .reader-content-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 2rem 1.5rem calc(var(--reader-nav-height) + 2rem) 1.5rem;
+  padding: 2rem 1.5rem calc(var(--reader-nav-height) + var(--safe-area-inset-bottom) + 2rem) 1.5rem;
 }
 
 .reader-paper {
@@ -1376,17 +1381,16 @@ p code, li code, td code {
   bottom: 0;
   left: 0;
   right: 0;
-  height: var(--reader-nav-height);
+  height: calc(var(--reader-nav-height) + var(--safe-area-inset-bottom));
   background-color: var(--app-bg-surface);
   border-top: 1px solid var(--app-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1rem;
+  padding: 0 calc(1rem + var(--safe-area-inset-right)) var(--safe-area-inset-bottom) calc(1rem + var(--safe-area-inset-left));
   gap: 0.75rem;
   z-index: 100;
   box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.35);
-  padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
 }
 
 .btn-page {
@@ -2004,7 +2008,7 @@ p code, li code, td code {
   .reader-toc-sheet {
     width: 310px;
     max-width: 86vw;
-    bottom: 0 !important;
+    bottom: var(--safe-area-inset-bottom) !important;
     z-index: 120 !important;
   }
 
@@ -2047,7 +2051,7 @@ p code, li code, td code {
   }
 
   .reader-content-scroll {
-    padding: 1.25rem 1rem calc(var(--reader-nav-height) + 1.5rem) 1rem;
+    padding: 1.25rem 1rem calc(var(--reader-nav-height) + var(--safe-area-inset-bottom) + 1.5rem) 1rem;
   }
 
   .btn-page {
