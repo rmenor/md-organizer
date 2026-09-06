@@ -64,6 +64,16 @@ test('La cabecera standalone no superpone el safe area superior', () => {
   assert.match(styles, /--safe-area-inset-top:\s*constant\(safe-area-inset-top\);/);
 });
 
+test('La pestaña Documentación Completa carga la wiki aunque el panel tenga placeholder', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'public/index.html'), 'utf8');
+  const appSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'app.js'), 'utf8');
+
+  assert.match(html, /data-wiki-tab="full"[^>]*>Documentación Completa/);
+  assert.match(appSource, /if \(target === 'full'\)\s*\{\s*loadWikiDoc\(\);\s*\}/);
+  assert.match(appSource, /if \(wikiDocLoaded && !force\) return;/);
+  assert.match(appSource, /wikiDocLoaded = true;/);
+});
+
 test('Capa de Base de Datos (SQLite3)', async (t) => {
   await t.test('Crea y recupera secciones y subsecciones', () => {
     const sec = getOrCreateSection('Tecnología');
@@ -446,4 +456,3 @@ test.after(() => {
   if (fs.existsSync(TEST_DB_PATH)) fs.unlinkSync(TEST_DB_PATH);
   if (fs.existsSync(TEST_LIB_PATH)) fs.rmSync(TEST_LIB_PATH, { recursive: true, force: true });
 });
-
