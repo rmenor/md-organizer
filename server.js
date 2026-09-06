@@ -355,7 +355,11 @@ app.post('/api/upload', (req, res, next) => {
     }
 
     if (err.isSecurityError) {
-      return res.status(400).json({ error: 'El archivo fue rechazado por motivos de seguridad.' });
+      console.warn('Rechazo por seguridad:', err.message);
+      return res.status(400).json({
+        error: `El archivo fue rechazado por motivos de seguridad: ${err.message}`,
+        isSecurityError: true
+      });
     }
 
     if (err.isValidationError) {

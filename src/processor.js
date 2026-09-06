@@ -48,22 +48,25 @@ const WIN_RESERVED = new Set([
  * @returns {string} safe resolved absolute path
  */
 function safeResolvePath(entryName, targetDir) {
+  // Normalizar barras iniciales que algunas herramientas ZIP incluyen de forma inocua
+  const cleanName = entryName.replace(/^[/\\]+/, '');
+
   // Reject null bytes
-  if (entryName.includes('\0')) {
+  if (cleanName.includes('\0')) {
     throw Object.assign(new Error(`Null byte in entry name: "${entryName}"`), { isSecurityError: true });
   }
 
-  if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(entryName)) {
+  if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(cleanName)) {
     throw Object.assign(new Error(`Path traversal attempt blocked: "${entryName}"`), { isSecurityError: true });
   }
 
-  // Reject absolute paths (both Unix and Windows)
-  if (path.isAbsolute(entryName) || /^[a-zA-Z]:/.test(entryName)) {
+  // Reject Windows drive letters
+  if (/^[a-zA-Z]:/.test(cleanName)) {
     throw Object.assign(new Error(`Absolute path in ZIP entry: "${entryName}"`), { isSecurityError: true });
   }
 
   // Check Windows reserved names in any path component
-  for (const part of entryName.split(/[\\/]/)) {
+  for (const part of cleanName.split(/[\\/]/)) {
     const upper = path.basename(part, path.extname(part)).toUpperCase();
     if (WIN_RESERVED.has(upper)) {
       throw Object.assign(new Error(`Reserved filename in ZIP: "${part}"`), { isSecurityError: true });
@@ -74,7 +77,7 @@ function safeResolvePath(entryName, targetDir) {
   }
 
   // Resolve and verify containment (Zip Slip)
-  const resolved = path.resolve(targetDir, entryName);
+  const resolved = path.resolve(targetDir, cleanName);
   const root = targetDir.endsWith(path.sep) ? targetDir : targetDir + path.sep;
   if (!resolved.startsWith(root) && resolved !== targetDir) {
     throw Object.assign(
