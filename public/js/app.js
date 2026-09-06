@@ -1223,14 +1223,26 @@ document.addEventListener('DOMContentLoaded', () => {
     currentIntegrityBookId = null;
   }
 
+  async function fetchJsonSafely(url, options = {}) {
+    const res = await fetch(url, options);
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const isHtml = contentType.includes('text/html');
+      if (res.status === 404) {
+        throw new Error('El endpoint solicitado no fue encontrado en el servidor (HTTP 404). Si el despliegue está en curso, recarga en unos instantes.');
+      }
+      throw new Error(`El servidor respondió con error ${res.status}${isHtml ? ' (página HTML)' : ''}. Por favor, recarga la aplicación.`);
+    }
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || `Error en la solicitud (HTTP ${res.status})`);
+    }
+    return data;
+  }
+
   async function loadIntegrityReport(bookId) {
     try {
-      const res = await fetch(`/api/books/${bookId}/integrity`);
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'No se pudo verificar la integridad del libro.');
-      }
+      const data = await fetchJsonSafely(`/api/books/${bookId}/integrity`);
 
       if (integrityBookTitle) integrityBookTitle.textContent = data.title || 'Publicación';
       if (integrityBookMeta) integrityBookMeta.textContent = `v${data.version || '1.0.0'} • Código: ${data.code || 'N/A'} • Total Capítulos: ${data.total_chapters || 0}`;
@@ -1351,10 +1363,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function loadVersionsHistory(bookId) {
     try {
-      const res = await fetch(`/api/books/${bookId}/versions`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'No se pudo cargar el historial de versiones.');
-
+      const data = await fetchJsonSafely(`/api/books/${bookId}/versions`);
       const versions = data.versions || [];
       const book = allBooksList.find(b => b.id === bookId);
 
@@ -1429,10 +1438,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function handleActivateVersion(bookId, versionId) {
     try {
-      const res = await fetch(`/api/books/${bookId}/activate-version/${versionId}`, { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'No se pudo activar la versión.');
-
+      await fetchJsonSafely(`/api/books/${bookId}/activate-version/${versionId}`, { method: 'POST' });
       await loadLibrary();
       await openVersionsModal(bookId);
     } catch (err) {
@@ -1444,13 +1450,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!currentVersionsBookId) return;
     try {
       const newState = bookStateSelector.value;
-      const res = await fetch(`/api/books/${currentVersionsBookId}/state`, {
+      await fetchJsonSafely(`/api/books/${currentVersionsBookId}/state`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ state: newState })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'No se pudo actualizar el estado.');
 
       await loadLibrary();
       await loadVersionsHistory(currentVersionsBookId);
@@ -1486,10 +1490,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (compareDiffViewer) compareDiffViewer.classList.add('hidden');
 
     try {
-      const res = await fetch(`/api/books/${bookId}/versions`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'No se pudieron obtener las versiones del libro.');
-
+      const data = await fetchJsonSafely(`/api/books/${bookId}/versions`);
       const versions = data.versions || [];
       if (versions.length < 2) {
         if (compareModalAlert) {
@@ -1541,10 +1542,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!fromVer || !toVer) return;
 
     try {
-      const res = await fetch(`/api/books/${bookId}/compare?from=${encodeURIComponent(fromVer)}&to=${encodeURIComponent(toVer)}`);
-      const report = await res.json();
-      if (!res.ok) throw new Error(report.error || 'Error al ejecutar la comparación.');
-
+      const report = await fetchJsonSafely(`/api/books/${bookId}/compare?from=${encodeURIComponent(fromVer)}&to=${encodeURIComponent(toVer)}`);
       renderCompareReport(report);
     } catch (err) {
       if (compareModalAlert) {
