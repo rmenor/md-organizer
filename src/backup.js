@@ -16,7 +16,8 @@ const {
   BASE_LIBRARY_PATH,
   safeResolvePath,
   securityScanZip,
-  sha256File
+  sha256File,
+  loadZipArchive
 } = require('./processor');
 
 const BACKUP_FORMAT = 'athenaeum-backup';
@@ -122,7 +123,7 @@ function inspectBackupArchive(zipFilePath) {
     throw new Error('El archivo de copia de seguridad no existe.');
   }
 
-  const zip = new AdmZip(zipFilePath);
+  const zip = loadZipArchive(zipFilePath);
   const entries = zip.getEntries();
 
   if (!entries || entries.length === 0) {
@@ -191,7 +192,7 @@ function inspectBackupArchive(zipFilePath) {
 async function restoreBackupArchive(zipFilePath) {
   // 1. Pre-flight check
   const inspection = inspectBackupArchive(zipFilePath);
-  const zip = new AdmZip(zipFilePath);
+  const zip = loadZipArchive(zipFilePath);
   const entries = zip.getEntries();
 
   const timestamp = Date.now();

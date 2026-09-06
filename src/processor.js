@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const zlib = require('zlib');
 const AdmZip = require('adm-zip');
 const { slugify, findBookByCode, createBookTransaction, replaceBookTransaction } = require('./db');
 const { normalizeSemVer, compareSemVer, diffSemVer } = require('./semver');
@@ -89,9 +90,10 @@ function safeResolvePath(entryName, targetDir) {
  * Performs a comprehensive security pre-scan of a ZIP before any extraction.
  * Checks: file count, entry sizes, compression ratio, ZIP bomb, blocked
  * extensions, and path traversal in all entry names.
+ * Ignora de forma segura los metadatos ocultos de macOS (__MACOSX, ._*, .DS_Store).
  * @param {string} zipFilePath  — path to the ZIP/MDZ on disk
- * @param {AdmZip} zip
- * @param {ZipEntry[]} entries
+ * @param {object} zip
+ * @param {object[]} entries
  */
 function securityScanZip(zipFilePath, zip, entries) {
   // 1. Compressed file size limit
@@ -104,17 +106,25 @@ function securityScanZip(zipFilePath, zip, entries) {
     );
   }
 
-  // 2. Entry count limit (prevents "too many files" DoS)
-  if (entries.length > MAX_ENTRY_COUNT) {
+  // Filtrar metadatos de macOS para el análisis de seguridad
+  const realEntries = entries.filter(e => {
+    const name = typeof e.entryName === 'string' ? e.entryName : '';
+    return !name.startsWith('__MACOSX/') &&
+           !path.basename(name).startsWith('._') &&
+           !name.endsWith('.DS_Store');
+  });
+
+  // 2. Entry count limit sobre archivos reales (evita DoS por millones de archivos)
+  if (realEntries.length > MAX_ENTRY_COUNT) {
     throw Object.assign(
-      new Error(`El ZIP contiene demasiados archivos: ${entries.length} (máximo ${MAX_ENTRY_COUNT}).`),
+      new Error(`El ZIP contiene demasiados archivos: ${realEntries.length} (máximo ${MAX_ENTRY_COUNT}).`),
       { isSecurityError: true }
     );
   }
 
   let totalUncompressed = 0;
 
-  for (const entry of entries) {
+  for (const entry of realEntries) {
     const name = typeof entry.entryName === 'string' ? entry.entryName : '';
     const header = entry.header || {};
     const compressedSize = header.compressedSize;
@@ -135,8 +145,8 @@ function securityScanZip(zipFilePath, zip, entries) {
       );
     }
 
-    // 4. ZIP bomb: compression ratio check
-    if (!entry.isDirectory && compressedSize > 0 && (uncompressedSize / compressedSize) > MAX_COMPRESSION_RATIO) {
+    // 4. ZIP bomb: compression ratio check (solo en archivos con contenido relevante)
+    if (!entry.isDirectory && compressedSize > 128 && uncompressedSize > 1024 && (uncompressedSize / compressedSize) > MAX_COMPRESSION_RATIO) {
       const ratio = (uncompressedSize / compressedSize).toFixed(0);
       throw Object.assign(
         new Error(`Posible ZIP bomb detectado: "${name}" tiene una ratio de compresión de ${ratio}× (máximo ${MAX_COMPRESSION_RATIO}×).`),
@@ -154,7 +164,7 @@ function securityScanZip(zipFilePath, zip, entries) {
       );
     }
 
-    // 6. Symlink detection via Unix file attributes (attr >> 16 gives Unix mode)
+    // 6. Symlink detection via Unix file attributes
     const unixAttrs = ((Number.isInteger(header.attr) ? header.attr : 0) >> 16) & 0xFFFF;
     const isSymlink = (unixAttrs & 0xF000) === 0xA000;
     if (isSymlink) {
@@ -351,25 +361,187 @@ function validateZipContents(zip, metadata, mdEntries, chaptersFolderEntries) {
 
 
 /**
+ * Lector de ZIP robusto basado en zlib nativo de Node.js.
+ * Se utiliza automáticamente como fallback si ADM-ZIP falla ante particularidades
+ * del compresor de macOS (ej: "ADM-ZIP: Number of disk entries is too large", ZIP64 o metadatos extendidos).
+ */
+function parseZipFallback(buffer) {
+  const entries = [];
+
+  // 1. Intentar leer desde el Central Directory (PK\x01\x02)
+  for (let i = 0; i <= buffer.length - 46; i++) {
+    if (buffer.readUInt32LE(i) === 0x02014b50) {
+      const flags = buffer.readUInt16LE(i + 8);
+      const method = buffer.readUInt16LE(i + 10);
+      let compSize = buffer.readUInt32LE(i + 20);
+      let uncompSize = buffer.readUInt32LE(i + 24);
+      const nameLen = buffer.readUInt16LE(i + 28);
+      const extraLen = buffer.readUInt16LE(i + 30);
+      const commentLen = buffer.readUInt16LE(i + 32);
+      let localOffset = buffer.readUInt32LE(i + 42);
+
+      if (i + 46 + nameLen <= buffer.length) {
+        const fileName = buffer.subarray(i + 46, i + 46 + nameLen).toString('utf8');
+
+        // Procesar campo extra ZIP64 si es necesario
+        if (extraLen > 0 && i + 46 + nameLen + extraLen <= buffer.length) {
+          let extraPos = i + 46 + nameLen;
+          const extraEnd = extraPos + extraLen;
+          while (extraPos + 4 <= extraEnd) {
+            const headerId = buffer.readUInt16LE(extraPos);
+            const dataSize = buffer.readUInt16LE(extraPos + 2);
+            extraPos += 4;
+            if (headerId === 0x0001 && extraPos + dataSize <= extraEnd) {
+              let p = extraPos;
+              if (uncompSize === 0xFFFFFFFF && p + 8 <= extraEnd) {
+                uncompSize = Number(buffer.readBigUInt64LE(p));
+                p += 8;
+              }
+              if (compSize === 0xFFFFFFFF && p + 8 <= extraEnd) {
+                compSize = Number(buffer.readBigUInt64LE(p));
+                p += 8;
+              }
+              if (localOffset === 0xFFFFFFFF && p + 8 <= extraEnd) {
+                localOffset = Number(buffer.readBigUInt64LE(p));
+                p += 8;
+              }
+            }
+            extraPos += dataSize;
+          }
+        }
+
+        const isDirectory = fileName.endsWith('/');
+        const currentCompSize = compSize;
+        const currentUncompSize = uncompSize;
+        const currentMethod = method;
+        const currentLocalOffset = localOffset;
+
+        entries.push({
+          entryName: fileName,
+          isDirectory,
+          header: {
+            size: currentUncompSize,
+            compressedSize: currentCompSize,
+            method: currentMethod
+          },
+          getData: () => {
+            if (isDirectory || currentUncompSize === 0) return Buffer.alloc(0);
+            if (currentLocalOffset + 30 > buffer.length || buffer.readUInt32LE(currentLocalOffset) !== 0x04034b50) {
+              throw new Error(`Cabecera local corrupta para "${fileName}"`);
+            }
+            const locNameLen = buffer.readUInt16LE(currentLocalOffset + 26);
+            const locExtraLen = buffer.readUInt16LE(currentLocalOffset + 28);
+            const dataStart = currentLocalOffset + 30 + locNameLen + locExtraLen;
+            const slice = buffer.subarray(dataStart, dataStart + currentCompSize);
+
+            if (currentMethod === 0) {
+              return Buffer.from(slice);
+            } else if (currentMethod === 8) {
+              return zlib.inflateRawSync(slice);
+            } else {
+              throw new Error(`Método de compresión no soportado (${currentMethod}) en "${fileName}"`);
+            }
+          }
+        });
+
+        i += 46 + nameLen + extraLen + commentLen - 1;
+      }
+    }
+  }
+
+  // 2. Si no se encontraron entradas en el Central Directory, escanear cabeceras locales (PK\x03\x04)
+  if (entries.length === 0) {
+    let pos = 0;
+    while (pos <= buffer.length - 30) {
+      if (buffer.readUInt32LE(pos) === 0x04034b50) {
+        const method = buffer.readUInt16LE(pos + 8);
+        const compSize = buffer.readUInt32LE(pos + 18);
+        const uncompSize = buffer.readUInt32LE(pos + 22);
+        const nameLen = buffer.readUInt16LE(pos + 26);
+        const extraLen = buffer.readUInt16LE(pos + 28);
+        const fileName = buffer.subarray(pos + 30, pos + 30 + nameLen).toString('utf8');
+        const isDirectory = fileName.endsWith('/');
+        const dataStart = pos + 30 + nameLen + extraLen;
+
+        const currentCompSize = compSize;
+        const currentUncompSize = uncompSize;
+        const currentMethod = method;
+
+        entries.push({
+          entryName: fileName,
+          isDirectory,
+          header: {
+            size: currentUncompSize,
+            compressedSize: currentCompSize,
+            method: currentMethod
+          },
+          getData: () => {
+            if (isDirectory || currentUncompSize === 0) return Buffer.alloc(0);
+            const slice = buffer.subarray(dataStart, dataStart + currentCompSize);
+            if (currentMethod === 0) {
+              return Buffer.from(slice);
+            } else if (currentMethod === 8) {
+              return zlib.inflateRawSync(slice);
+            } else {
+              throw new Error(`Método de compresión no soportado (${currentMethod})`);
+            }
+          }
+        });
+
+        pos = dataStart + compSize;
+      } else {
+        pos++;
+      }
+    }
+  }
+
+  return {
+    getEntries: () => entries,
+    readAsText: (entry) => entry.getData().toString('utf8'),
+    readFile: (entry) => entry.getData()
+  };
+}
+
+/**
+ * Carga un archivo ZIP intentando primero con AdmZip y cayendo en parseZipFallback si falla.
+ */
+function loadZipArchive(zipFilePath) {
+  try {
+    const zip = new AdmZip(zipFilePath);
+    const entries = zip.getEntries();
+    if (entries && entries.length > 0) {
+      return zip;
+    }
+  } catch (err) {
+    console.warn(`[ZIP Reader] AdmZip no pudo procesar el archivo (${err.message}). Utilizando lector nativo zlib.`);
+  }
+
+  const buffer = fs.readFileSync(zipFilePath);
+  return parseZipFallback(buffer);
+}
+
+/**
  * Procesa un archivo ZIP y lo organiza como libro completo en la biblioteca.
  * Incluye resolución de colisiones por código y fecha/versión.
  */
 async function processZipFile(zipFilePath, originalName = 'Libro') {
 
   validateZipFileSignature(zipFilePath);
-  const zip = new AdmZip(zipFilePath);
+  const zip = loadZipArchive(zipFilePath);
   const zipEntries = zip.getEntries();
+
+  // Escaneo de seguridad (Zip Slip, ZIP bomb, extensiones no permitidas, tamaños)
   securityScanZip(zipFilePath, zip, zipEntries);
 
   if (!zipEntries || zipEntries.length === 0) {
     throw new Error('El archivo comprimido (.zip o .mdz) está vacío o dañado.');
   }
 
-  // 1. Buscar metadatos JSON
+  // 1. Buscar metadatos JSON (ignorando entradas de __MACOSX)
   let metadata = null;
 
   // 1a. Buscar manifest.json (Estándar MDZ / Book Profile)
-  const manifestEntry = zipEntries.find(e => !e.isDirectory && /(^|\/)manifest\.json$/i.test(e.entryName));
+  const manifestEntry = zipEntries.find(e => !e.isDirectory && !e.entryName.startsWith('__MACOSX/') && !path.basename(e.entryName).startsWith('._') && /(^|\/)manifest\.json$/i.test(e.entryName));
   if (manifestEntry) {
     try {
       const manifestJson = JSON.parse(zip.readAsText(manifestEntry));
@@ -379,10 +551,10 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
       let bookMetaEntry = null;
       if (typeof manifestJson.metadata === 'string') {
         const metaPath = manifestJson.metadata.replace(/^[/\\]+/, '');
-        bookMetaEntry = zipEntries.find(e => !e.isDirectory && e.entryName.endsWith(metaPath));
+        bookMetaEntry = zipEntries.find(e => !e.isDirectory && !e.entryName.startsWith('__MACOSX/') && e.entryName.endsWith(metaPath));
       }
       if (!bookMetaEntry) {
-        bookMetaEntry = zipEntries.find(e => !e.isDirectory && /(^|\/)metadata\/book\.json$/i.test(e.entryName));
+        bookMetaEntry = zipEntries.find(e => !e.isDirectory && !e.entryName.startsWith('__MACOSX/') && /(^|\/)metadata\/book\.json$/i.test(e.entryName));
       }
 
       if (bookMetaEntry) {
@@ -403,7 +575,7 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
 
   // 1b. Si no se encontró manifest.json, buscar metadata.json o book.json (Perfil Simple / Legacy)
   if (!metadata) {
-    const metadataEntry = zipEntries.find(e => !e.isDirectory && /(^|\/)(metadata|book)\.json$/i.test(e.entryName));
+    const metadataEntry = zipEntries.find(e => !e.isDirectory && !e.entryName.startsWith('__MACOSX/') && !path.basename(e.entryName).startsWith('._') && /(^|\/)(metadata|book)\.json$/i.test(e.entryName));
     if (metadataEntry) {
       try {
         metadata = JSON.parse(zip.readAsText(metadataEntry));
@@ -413,9 +585,9 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
     }
   }
 
-  // 2. Localizar archivos Markdown e imágenes
-  const mdEntries = zipEntries.filter(e => !e.isDirectory && /\.md$/i.test(e.entryName));
-  const assetEntries = zipEntries.filter(e => !e.isDirectory && /\.(png|jpe?g|gif|webp|svg)$/i.test(e.entryName));
+  // 2. Localizar archivos Markdown e imágenes (filtrando basura oculta de macOS como __MACOSX y ._*)
+  const mdEntries = zipEntries.filter(e => !e.isDirectory && !e.entryName.startsWith('__MACOSX/') && !path.basename(e.entryName).startsWith('._') && /\.md$/i.test(e.entryName));
+  const assetEntries = zipEntries.filter(e => !e.isDirectory && !e.entryName.startsWith('__MACOSX/') && !path.basename(e.entryName).startsWith('._') && /\.(png|jpe?g|gif|webp|svg)$/i.test(e.entryName));
 
   const assetNames = new Set();
   for (const asset of assetEntries) {
@@ -767,5 +939,6 @@ module.exports = {
   sha256File,
   safeResolvePath,
   securityScanZip,
-  validateAssetMagic
+  validateAssetMagic,
+  loadZipArchive
 };
