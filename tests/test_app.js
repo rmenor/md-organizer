@@ -23,7 +23,9 @@ const {
   getBookById,
   getChapterContent,
   searchLibrary,
-  deleteBook
+  deleteBook,
+  verifyBookIntegrity,
+  verifyLibraryIntegrity
 } = require('../src/db');
 const { processZipFile, safeResolvePath, securityScanZip } = require('../src/processor');
 const {
@@ -449,6 +451,118 @@ test('Sistema de Copias de Seguridad y Restauración (Backup & Restore)', async 
     tempBackupFiles.forEach(f => {
       if (fs.existsSync(f)) fs.unlinkSync(f);
     });
+  });
+});
+
+test('Verificación de Integridad Criptográfica SHA-256', async (t) => {
+  let sampleZipPath;
+
+  t.before(() => {
+    // Crear un paquete ZIP de prueba con metadatos y capítulos
+    const zip = new AdmZip();
+    const manifest = {
+      code: 'INTEG-01',
+      title: 'Libro de Integridad Criptográfica',
+      author: 'Security Team',
+      version: '1.0.0',
+      publication_date: '2026-09-06',
+      section: 'Seguridad',
+      subsection: 'Criptografía',
+      chapters: [
+        { number: 1, title: 'Introducción al Hashing', file: '01_intro.md' },
+        { number: 2, title: 'Prueba de Manipulación', file: '02_tamper.md' }
+      ]
+    };
+
+    zip.addFile('metadata.json', Buffer.from(JSON.stringify(manifest)));
+    zip.addFile('01_intro.md', Buffer.from('# Capítulo 1\nContenido original e inalterado.'));
+    zip.addFile('02_tamper.md', Buffer.from('# Capítulo 2\nSegundo capítulo para pruebas de integridad.'));
+
+    sampleZipPath = path.join(__dirname, 'test_integrity_pkg.zip');
+    zip.writeZip(sampleZipPath);
+  });
+
+  await t.test('1. Procesa ZIP calculando hashes SHA-256 en capítulos y hash compuesto', async () => {
+    const result = await processZipFile(sampleZipPath);
+    assert.ok(result.id > 0);
+
+    const book = getBookById(result.id);
+    assert.ok(book.checksum, 'El libro debe tener un hash compuesto almacenado');
+    assert.equal(book.checksum.length, 64, 'El hash SHA-256 debe tener 64 caracteres hexadecimales');
+
+    const chapters = book.chapters;
+    assert.equal(chapters.length, 2);
+    chapters.forEach(c => {
+      assert.ok(c.checksum, 'Cada capítulo debe tener un checksum SHA-256');
+      assert.equal(c.checksum.length, 64);
+    });
+  });
+
+  await t.test('2. Verifica integridad exitosamente (status: verified) cuando los archivos están intactos', () => {
+    const rawBook = findBookByCode('INTEG-01');
+    assert.ok(rawBook);
+
+    const report = verifyBookIntegrity(rawBook.id);
+    assert.equal(report.status, 'verified');
+    assert.equal(report.total_chapters, 2);
+    assert.equal(report.chapters.every(c => c.status === 'verified'), true);
+    assert.equal(report.composite_checksum, report.stored_checksum);
+  });
+
+  await t.test('3. Detecta alteración (status: modified) cuando un archivo markdown es modificado en disco', () => {
+    const rawBook = findBookByCode('INTEG-01');
+    assert.ok(rawBook);
+    const book = getBookById(rawBook.id);
+
+    const chapter2 = book.chapters.find(c => c.order_index === 2);
+    const chapter2Path = path.join(book.storage_path, chapter2.relative_path);
+
+    // Alterar el archivo en disco simulando una modificación o inyección
+    fs.writeFileSync(chapter2Path, '# Capítulo 2\nContenido MODIFICADO por un atacante o error de disco.', 'utf8');
+
+    const report = verifyBookIntegrity(book.id);
+    assert.equal(report.status, 'modified', 'El estado global debe indicar modificado');
+
+    const c1 = report.chapters.find(c => c.chapter_number === 1);
+    const c2 = report.chapters.find(c => c.chapter_number === 2);
+
+    assert.equal(c1.status, 'verified');
+    assert.equal(c2.status, 'modified');
+    assert.notEqual(c2.calculated_checksum, c2.stored_checksum);
+  });
+
+  await t.test('4. Detecta archivos faltantes (status: missing_files) cuando un archivo es eliminado', () => {
+    const rawBook = findBookByCode('INTEG-01');
+    assert.ok(rawBook);
+    const book = getBookById(rawBook.id);
+
+    const chapter1 = book.chapters.find(c => c.order_index === 1);
+    const chapter1Path = path.join(book.storage_path, chapter1.relative_path);
+
+    // Borrar el archivo
+    fs.unlinkSync(chapter1Path);
+
+    const report = verifyBookIntegrity(book.id);
+    assert.equal(report.status, 'missing_files');
+
+    const c1 = report.chapters.find(c => c.chapter_number === 1);
+    assert.equal(c1.status, 'missing');
+    assert.equal(c1.calculated_checksum, null);
+  });
+
+  await t.test('5. Auditoría global de la biblioteca (verifyLibraryIntegrity)', () => {
+    const globalReport = verifyLibraryIntegrity();
+    assert.ok(globalReport.total_books >= 1);
+    assert.ok(globalReport.books.length >= 1);
+    const auditedBook = globalReport.books.find(b => b.code === 'INTEG-01');
+    assert.ok(auditedBook);
+    assert.equal(auditedBook.status, 'missing_files');
+  });
+
+  t.after(() => {
+    if (sampleZipPath && fs.existsSync(sampleZipPath)) {
+      fs.unlinkSync(sampleZipPath);
+    }
   });
 });
 

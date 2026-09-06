@@ -8,7 +8,9 @@ const {
   getBookById,
   getChapterContent,
   deleteBook,
-  searchLibrary
+  searchLibrary,
+  verifyBookIntegrity,
+  verifyLibraryIntegrity
 } = require('./src/db');
 const { processZipFile } = require('./src/processor');
 const {
@@ -165,6 +167,30 @@ app.get('/api/books/:bookId/chapters/:chapterId', (req, res) => {
     res.status(404).json({ error: err.message });
   }
 });
+
+// Endpoint: Verificar integridad criptográfica SHA-256 de un libro y sus capítulos
+app.get('/api/books/:id/integrity', (req, res) => {
+  try {
+    const report = verifyBookIntegrity(req.params.id);
+    if (!report) {
+      return res.status(404).json({ error: 'Libro no encontrado' });
+    }
+    res.json(report);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint: Auditoría de integridad global de toda la biblioteca
+app.get('/api/integrity', (req, res) => {
+  try {
+    const report = verifyLibraryIntegrity();
+    res.json(report);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // Endpoint: Subir y procesar un archivo ZIP o MDZ
 const uploadFields = upload.fields([

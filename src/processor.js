@@ -588,21 +588,30 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
 
   let chaptersData = [];
   let coverImagePath = '';
+  let compositeBookChecksum = '';
 
   try {
-    // 7a. Escribir capítulos en staging
+    // 7a. Escribir capítulos en staging y calcular hash SHA-256
     for (const ch of chapters) {
       const targetFileName = `${String(ch.order_index).padStart(2, '0')}_${ch.file_name}`;
       const targetFilePath = safeResolvePath(targetFileName, stagingDir);
-      fs.writeFileSync(targetFilePath, ch.entry.getData());
+      const chData = ch.entry.getData();
+      const chapterChecksum = crypto.createHash('sha256').update(chData).digest('hex');
+      fs.writeFileSync(targetFilePath, chData);
       chaptersData.push({
         title: ch.title,
         order_index: ch.order_index,
         file_name: targetFileName,
         relative_path: targetFileName,
-        word_count: ch.word_count
+        word_count: ch.word_count,
+        checksum: chapterChecksum
       });
     }
+
+    // Calcular hash SHA-256 canónico del libro completo
+    compositeBookChecksum = crypto.createHash('sha256')
+      .update(`${metadata.code}:${metadata.version}:${chaptersData.map(c => c.checksum).join(':')}`)
+      .digest('hex');
 
     // 7b. Extraer assets en staging
     if (assetEntries.length > 0) {
@@ -623,7 +632,7 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
       }
     }
 
-    // 7c. Guardar metadata.json normalizado en staging
+    // 7c. Guardar metadata.json normalizado en staging con checksums
     const completeMetadata = {
       code: metadata.code,
       title: metadata.title,
@@ -636,12 +645,14 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
       subsection: metadata.subsection,
       cover: coverImagePath,
       language: metadata.language || 'es',
+      checksum: compositeBookChecksum,
       updated_at: new Date().toISOString(),
       chapters: chaptersData.map(c => ({
         order: c.order_index,
         title: c.title,
         file: c.file_name,
-        words: c.word_count
+        words: c.word_count,
+        checksum: c.checksum
       }))
     };
     fs.writeFileSync(
@@ -666,7 +677,8 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
     section: metadata.section,
     subsection: metadata.subsection,
     cover_image: coverImagePath,
-    storage_path: finalDir   // apuntamos ya al path final
+    storage_path: finalDir,   // apuntamos ya al path final
+    checksum: compositeBookChecksum
   };
 
   let bookId;

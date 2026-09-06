@@ -87,6 +87,12 @@ Export and restore your entire digital library with one click:
 - **Atomic Restore with Automatic Rollback**: Restores all books and database tables in a staging transaction. If an error occurs, the system automatically rolls back to the previous snapshot without data loss.
 - **Cross-Platform Portability**: Restored book `storage_path` references are dynamically remapped to match the host platform's path layout (macOS, Linux, Windows, or Docker).
 
+### 🛡️ Cryptographic SHA-256 Integrity Verification
+Detect file tampering, disk corruption, or unauthorized modifications across your library:
+- **Per-Chapter & Composite Hashing**: During ingestion, a SHA-256 digest is generated for every Markdown chapter, asset, and a canonical composite checksum for the publication.
+- **Real-Time Live Audit**: Audit any book (`GET /api/books/:id/integrity`) or the entire library (`GET /api/integrity`) on demand to compare stored cryptographic checksums with physical disk contents.
+- **Interactive Verification UI**: Inspect individual chapter checksums, copy canonical hashes, and view real-time status badges (`✓ Verificado`, `⚠ Modificado`, `✕ No existe`).
+
 
 ### 📖 Distraction-Free Web Reader
 - **Automatic Reading Resume (`localStorage`)**: Never lose your spot. MD Organizer automatically remembers the exact chapter and scroll position where you left off. Reopening any book instantly resumes right where you were, accompanied by in-library reading badges (`Cap. X`) and a subtle resume notification.
@@ -245,6 +251,7 @@ PORT=8080 node server.js
 - **Control de Versiones inteligente**: Detecta el código del libro (`code`), compara números de versión y fechas de publicación, actualizando automáticamente las nuevas ediciones o advirtiendo para evitar pérdidas.
 - **Importación segura — el libro existente nunca se destruye**: Antes de escribir nada en disco ni en la base de datos, cada subida pasa por una validación completa en memoria. Solo si todos los checks son correctos (archivo no vacío, capítulos Markdown presentes, capítulos del manifest accesibles, sin capítulos vacíos, título y versión válidos) el sistema escribe los archivos en un directorio de staging y después ejecuta la transacción de base de datos. Si algo falla en cualquier punto, el staging se elimina automáticamente y el libro anterior queda **intacto**. Los errores se muestran como lista detallada en el modal de subida.
 - **Copias de Seguridad y Restauración Atómica (Backup & Restore)**: Exporta en un solo clic un archivo `.zip` completo con la instantánea SQLite, metadatos y todos los archivos Markdown de la biblioteca. La restauración cuenta con inspección previa (pre-flight), re-mapeo automático de rutas y rollback automático ante cualquier fallo.
+- **Verificación Criptográfica de Integridad SHA-256**: Generación de huellas digitales SHA-256 por capítulo y hash compuesto canónico por libro durante la importación. Permite auditar en tiempo real (`GET /api/books/:id/integrity` y `GET /api/integrity`) si algún archivo en disco ha sido modificado, dañado o eliminado, con modal interactivo y badges visuales.
 - **Lector web libre de distracciones**:
   - **Reanudación automática de lectura (`localStorage`)**: Guarda automáticamente tu capítulo y posición de desplazamiento exacta para continuar donde lo dejaste nada más abrir el libro, indicando el capítulo en curso en la biblioteca.
   - Modos **Oscuro**, **Sepia** y **Claro**.

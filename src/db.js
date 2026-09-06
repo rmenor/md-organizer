@@ -1,6 +1,8 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+
 
 const DB_PATH = process.env.DB_PATH || (process.env.VERCEL ? path.join('/tmp', 'library.db') : path.join(__dirname, '..', 'library.db'));
 
@@ -21,13 +23,13 @@ let insertChapterStmt;
 
 function prepareStatements() {
   insertBookStmt = db.prepare(`
-    INSERT INTO books (subsection_id, code, title, slug, version, publication_date, author, description, cover_image, storage_path, total_chapters)
-    VALUES (@subsection_id, @code, @title, @slug, @version, @publication_date, @author, @description, @cover_image, @storage_path, @total_chapters)
+    INSERT INTO books (subsection_id, code, title, slug, version, publication_date, author, description, cover_image, storage_path, total_chapters, checksum)
+    VALUES (@subsection_id, @code, @title, @slug, @version, @publication_date, @author, @description, @cover_image, @storage_path, @total_chapters, @checksum)
   `);
 
   insertChapterStmt = db.prepare(`
-    INSERT INTO chapters (book_id, title, order_index, file_name, relative_path, word_count)
-    VALUES (@book_id, @title, @order_index, @file_name, @relative_path, @word_count)
+    INSERT INTO chapters (book_id, title, order_index, file_name, relative_path, word_count, checksum)
+    VALUES (@book_id, @title, @order_index, @file_name, @relative_path, @word_count, @checksum)
   `);
 }
 
@@ -63,6 +65,7 @@ function initDb() {
       cover_image TEXT DEFAULT '',
       storage_path TEXT NOT NULL,
       total_chapters INTEGER DEFAULT 0,
+      checksum TEXT NOT NULL DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -75,6 +78,7 @@ function initDb() {
       file_name TEXT NOT NULL,
       relative_path TEXT NOT NULL,
       word_count INTEGER DEFAULT 0,
+      checksum TEXT NOT NULL DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -95,7 +99,15 @@ function initDb() {
   if (!columns.includes('publication_date')) {
     db.exec("ALTER TABLE books ADD COLUMN publication_date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP");
   }
+  if (!columns.includes('checksum')) {
+    db.exec("ALTER TABLE books ADD COLUMN checksum TEXT NOT NULL DEFAULT ''");
+  }
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_code ON books(code)");
+
+  const chapterCols = db.prepare("PRAGMA table_info(chapters)").all().map(c => c.name);
+  if (!chapterCols.includes('checksum')) {
+    db.exec("ALTER TABLE chapters ADD COLUMN checksum TEXT NOT NULL DEFAULT ''");
+  }
 }
 
 initDb();
@@ -137,7 +149,13 @@ function remapStoragePaths(baseLibraryPath) {
   const tx = db.transaction(() => {
     for (const b of books) {
       const folderName = path.basename(b.storage_path);
-      const newPath = path.join(baseLibraryPath, b.section_slug, b.subsection_slug, folderName);
+      let newPath = path.join(baseLibraryPath, b.section_slug, b.subsection_slug, folderName);
+      if (!fs.existsSync(newPath)) {
+        const flatPath = path.join(baseLibraryPath, folderName);
+        if (fs.existsSync(flatPath)) {
+          newPath = flatPath;
+        }
+      }
       updateStmt.run(newPath, b.id);
     }
   });
@@ -208,7 +226,8 @@ function createBookTransaction(bookData, chaptersData) {
       description: bookData.description || '',
       cover_image: bookData.cover_image || '',
       storage_path: bookData.storage_path,
-      total_chapters: chaptersData.length
+      total_chapters: chaptersData.length,
+      checksum: bookData.checksum || ''
     });
 
     const bookId = bookResult.lastInsertRowid;
@@ -220,7 +239,8 @@ function createBookTransaction(bookData, chaptersData) {
         order_index: ch.order_index,
         file_name: ch.file_name,
         relative_path: ch.relative_path,
-        word_count: ch.word_count || 0
+        word_count: ch.word_count || 0,
+        checksum: ch.checksum || ''
       });
     }
 
@@ -251,6 +271,7 @@ function replaceBookTransaction(existingBookId, bookData, chaptersData) {
           cover_image = @cover_image,
           storage_path = @storage_path,
           total_chapters = @total_chapters,
+          checksum = @checksum,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = @id
     `).run({
@@ -265,7 +286,8 @@ function replaceBookTransaction(existingBookId, bookData, chaptersData) {
       description: bookData.description || '',
       cover_image: bookData.cover_image || '',
       storage_path: bookData.storage_path,
-      total_chapters: chaptersData.length
+      total_chapters: chaptersData.length,
+      checksum: bookData.checksum || ''
     });
 
     // Eliminar capítulos antiguos
@@ -279,7 +301,8 @@ function replaceBookTransaction(existingBookId, bookData, chaptersData) {
         order_index: ch.order_index,
         file_name: ch.file_name,
         relative_path: ch.relative_path,
-        word_count: ch.word_count || 0
+        word_count: ch.word_count || 0,
+        checksum: ch.checksum || ''
       });
     }
 
@@ -421,6 +444,112 @@ function searchLibrary(query) {
   return books;
 }
 
+function verifyBookIntegrity(bookId) {
+  const book = getBookById(bookId);
+  if (!book) return null;
+
+  let anyMissing = false;
+  let anyModified = false;
+  const chaptersReport = [];
+  const hashesForComposite = [];
+
+  for (const ch of book.chapters) {
+    const filePath = path.join(book.storage_path, ch.relative_path);
+    if (!fs.existsSync(filePath)) {
+      anyMissing = true;
+      chaptersReport.push({
+        id: ch.id,
+        title: ch.title,
+        order_index: ch.order_index,
+        chapter_number: ch.order_index,
+        file_name: ch.file_name,
+        relative_path: ch.relative_path,
+        expectedChecksum: ch.checksum || '',
+        actualChecksum: null,
+        status: 'missing'
+      });
+      continue;
+    }
+
+    const contentBuf = fs.readFileSync(filePath);
+    const actualChecksum = crypto.createHash('sha256').update(contentBuf).digest('hex');
+    hashesForComposite.push(actualChecksum);
+
+    let status = 'verified';
+    if (ch.checksum && ch.checksum !== actualChecksum) {
+      status = 'modified';
+      anyModified = true;
+    }
+
+    chaptersReport.push({
+      id: ch.id,
+      title: ch.title,
+      order_index: ch.order_index,
+      chapter_number: ch.order_index,
+      file_name: ch.file_name,
+      relative_path: ch.relative_path,
+      expectedChecksum: ch.checksum || '',
+      actualChecksum,
+      status
+    });
+  }
+
+  // Hash canónico del libro a partir de sus capítulos actuales
+  const currentComposite = crypto.createHash('sha256')
+    .update(`${book.code}:${book.version}:${hashesForComposite.join(':')}`)
+    .digest('hex');
+
+  let bookStatus = 'verified';
+  if (anyMissing) {
+    bookStatus = 'missing_files';
+  } else if (anyModified || (book.checksum && book.checksum !== currentComposite)) {
+    bookStatus = 'modified';
+  }
+
+  return {
+    bookId: book.id,
+    id: book.id,
+    title: book.title,
+    code: book.code,
+    version: book.version,
+    status: bookStatus,
+    bookChecksum: book.checksum || currentComposite,
+    composite_checksum: currentComposite,
+    stored_checksum: book.checksum || currentComposite,
+    total_chapters: chaptersReport.length,
+    chapters: chaptersReport.map(c => ({
+      ...c,
+      stored_checksum: c.expectedChecksum,
+      calculated_checksum: c.actualChecksum
+    })),
+    verifiedAt: new Date().toISOString()
+  };
+}
+
+function verifyLibraryIntegrity() {
+  const books = db.prepare('SELECT id FROM books ORDER BY id ASC').all();
+  const reports = books.map(b => verifyBookIntegrity(b.id)).filter(Boolean);
+  const total = reports.length;
+  const verified = reports.filter(r => r.status === 'verified').length;
+  const modified = reports.filter(r => r.status === 'modified').length;
+  const missing = reports.filter(r => r.status === 'missing_files').length;
+
+  return {
+    totalBooks: total,
+    total_books: total,
+    verifiedBooks: verified,
+    verified_books: verified,
+    modifiedBooks: modified,
+    modified_books: modified,
+    missingFilesBooks: missing,
+    missing_files_books: missing,
+    allHealthy: total > 0 && verified === total,
+    all_healthy: total > 0 && verified === total,
+    books: reports,
+    verifiedAt: new Date().toISOString()
+  };
+}
+
 module.exports = {
   db,
   DB_PATH,
@@ -439,6 +568,9 @@ module.exports = {
   reopenDatabase,
   closeDatabase,
   remapStoragePaths,
-  getDatabaseStats
+  getDatabaseStats,
+  verifyBookIntegrity,
+  verifyLibraryIntegrity
 };
+
 

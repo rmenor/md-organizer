@@ -107,6 +107,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnConfirmRestore = document.getElementById('btn-confirm-restore');
   let selectedBackupFile = null;
 
+  // Modal Integridad SHA-256
+  const integrityModal = document.getElementById('integrity-modal');
+  const btnCloseIntegrityModal = document.getElementById('btn-close-integrity-modal');
+  const btnCloseIntegrityBtn = document.getElementById('btn-close-integrity-btn');
+  const btnReverifyIntegrity = document.getElementById('btn-reverify-integrity');
+  const integrityBookTitle = document.getElementById('integrity-book-title');
+  const integrityBookMeta = document.getElementById('integrity-book-meta');
+  const integrityGlobalStatus = document.getElementById('integrity-global-status');
+  const integrityCompositeHash = document.getElementById('integrity-composite-hash');
+  const btnCopyBookHash = document.getElementById('btn-copy-book-hash');
+  const integrityChaptersTbody = document.getElementById('integrity-chapters-tbody');
+  const integrityModalAlert = document.getElementById('integrity-modal-alert');
+  let currentIntegrityBookId = null;
+
+
 
   // Utilidad para sanitizar texto HTML
   function escapeHtml(str) {
@@ -422,6 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="book-cover-inner">
           <span class="book-cover-title-emboss">${escapeHtml(book.title)}</span>
           </div>
+          <button class="btn-book-integrity" data-book-id="${escapeHtml(book.id)}" title="Verificar integridad SHA-256">🛡️</button>
           <button class="btn-book-delete" data-book-id="${escapeHtml(book.id)}" title="Eliminar publicación">✕</button>
         </div>
         <div class="book-card-info">
@@ -432,7 +448,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const realCover = card.querySelector('.book-real-cover');
       realCover?.addEventListener('error', () => realCover.remove(), { once: true });
 
-      card.querySelector('.btn-book-delete').addEventListener('click', (e) => {
+      card.querySelector('.btn-book-integrity')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openIntegrityModal(book.id);
+      });
+
+      card.querySelector('.btn-book-delete')?.addEventListener('click', (e) => {
         e.stopPropagation();
         openDeleteModal(book);
       });
@@ -479,8 +500,19 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>Fecha: <strong>${escapeHtml(book.publication_date ? book.publication_date.substring(0, 10) : 'N/A')}</strong></span>
           </div>
         </div>
-        <div class="update-status-pill">✓ Instalado</div>
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <button class="badge-integrity" data-book-id="${escapeHtml(book.id)}" title="Verificar integridad criptográfica SHA-256">
+            🛡️ SHA-256
+          </button>
+          <div class="update-status-pill">✓ Instalado</div>
+        </div>
       `;
+
+      item.querySelector('.badge-integrity')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openIntegrityModal(book.id);
+      });
+
       updatesCardsContainer.appendChild(item);
     });
   }
@@ -1102,6 +1134,136 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
 
+  // ==========================================
+  // MODAL DE INTEGRIDAD SHA-256
+  // ==========================================
+  async function openIntegrityModal(bookId) {
+    if (!integrityModal) return;
+    currentIntegrityBookId = bookId;
+    integrityModal.classList.remove('hidden');
+    if (integrityModalAlert) integrityModalAlert.classList.add('hidden');
+    if (integrityChaptersTbody) {
+      integrityChaptersTbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:1.5rem; color:var(--app-text-dim);">Calculando huellas criptográficas SHA-256...</td></tr>';
+    }
+    if (integrityGlobalStatus) {
+      integrityGlobalStatus.className = 'integrity-status-pill';
+      integrityGlobalStatus.textContent = 'Verificando...';
+    }
+    if (integrityCompositeHash) integrityCompositeHash.textContent = 'Calculando...';
+
+    const book = allBooksList.find(b => b.id === bookId);
+    if (book) {
+      if (integrityBookTitle) integrityBookTitle.textContent = book.title;
+      if (integrityBookMeta) integrityBookMeta.textContent = `v${book.version || '1.0.0'} • Código: ${book.code || 'N/A'}`;
+    }
+
+    await loadIntegrityReport(bookId);
+  }
+
+  function closeIntegrityModal() {
+    if (!integrityModal) return;
+    integrityModal.classList.add('hidden');
+    currentIntegrityBookId = null;
+  }
+
+  async function loadIntegrityReport(bookId) {
+    try {
+      const res = await fetch(`/api/books/${bookId}/integrity`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'No se pudo verificar la integridad del libro.');
+      }
+
+      if (integrityBookTitle) integrityBookTitle.textContent = data.title || 'Publicación';
+      if (integrityBookMeta) integrityBookMeta.textContent = `v${data.version || '1.0.0'} • Código: ${data.code || 'N/A'} • Total Capítulos: ${data.total_chapters || 0}`;
+      if (integrityCompositeHash) integrityCompositeHash.textContent = data.composite_checksum || data.stored_checksum || 'N/A';
+
+      if (integrityGlobalStatus) {
+        if (data.status === 'verified') {
+          integrityGlobalStatus.className = 'integrity-status-pill verified';
+          integrityGlobalStatus.textContent = '✓ Integridad Verificada';
+        } else if (data.status === 'modified') {
+          integrityGlobalStatus.className = 'integrity-status-pill modified';
+          integrityGlobalStatus.textContent = '⚠ Modificado / Alterado';
+        } else {
+          integrityGlobalStatus.className = 'integrity-status-pill missing';
+          integrityGlobalStatus.textContent = '✕ Archivos Faltantes';
+        }
+      }
+
+      // Render tabla de capítulos
+      if (integrityChaptersTbody) {
+        if (data.chapters && data.chapters.length > 0) {
+          integrityChaptersTbody.innerHTML = data.chapters.map(c => {
+            let statusBadge = '';
+            if (c.status === 'verified') {
+              statusBadge = '<span class="status-verified">✓ Verificado</span>';
+            } else if (c.status === 'modified') {
+              statusBadge = '<span class="status-modified" title="El hash del archivo en disco difiere del registrado">⚠ Modificado</span>';
+            } else {
+              statusBadge = '<span class="status-missing" title="Archivo no encontrado en disco">✕ No existe</span>';
+            }
+
+            const hashToShow = c.calculated_checksum || c.stored_checksum || '';
+            const shortHash = hashToShow.length > 20
+              ? `${hashToShow.substring(0, 8)}...${hashToShow.substring(hashToShow.length - 8)}`
+              : (hashToShow || 'N/A');
+
+            return `
+              <tr>
+                <td><strong>Cap. ${escapeHtml(c.chapter_number)}</strong>: ${escapeHtml(c.title || '')}</td>
+                <td class="mono" style="font-size:0.75rem;">${escapeHtml(c.relative_path || '')}</td>
+                <td class="mono" title="${escapeHtml(hashToShow)}">${escapeHtml(shortHash)}</td>
+                <td>${statusBadge}</td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          integrityChaptersTbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:1rem; color:var(--app-text-dim);">No hay capítulos registrados para auditar.</td></tr>';
+        }
+      }
+
+    } catch (err) {
+      if (integrityGlobalStatus) {
+        integrityGlobalStatus.className = 'integrity-status-pill modified';
+        integrityGlobalStatus.textContent = 'Error';
+      }
+      if (integrityModalAlert) {
+        integrityModalAlert.textContent = err.message;
+        integrityModalAlert.className = 'alert-message error';
+        integrityModalAlert.classList.remove('hidden');
+      }
+    }
+  }
+
+  // Listeners para modal de integridad
+  btnCloseIntegrityModal?.addEventListener('click', closeIntegrityModal);
+  btnCloseIntegrityBtn?.addEventListener('click', closeIntegrityModal);
+
+  btnReverifyIntegrity?.addEventListener('click', () => {
+    if (currentIntegrityBookId) {
+      loadIntegrityReport(currentIntegrityBookId);
+    }
+  });
+
+  btnCopyBookHash?.addEventListener('click', () => {
+    if (!integrityCompositeHash || !integrityCompositeHash.textContent) return;
+    navigator.clipboard.writeText(integrityCompositeHash.textContent).then(() => {
+      const orig = btnCopyBookHash.textContent;
+      btnCopyBookHash.textContent = '¡Copiado!';
+      setTimeout(() => { btnCopyBookHash.textContent = orig; }, 2000);
+    }).catch(() => {});
+  });
+
+  if (integrityModal) {
+    integrityModal.addEventListener('click', (e) => {
+      if (e.target === integrityModal) closeIntegrityModal();
+    });
+  }
+
+  window.openIntegrityModal = openIntegrityModal;
+
   function checkHash() {
     const h = window.location.hash;
     if (h === '#books') {
@@ -1120,6 +1282,8 @@ document.addEventListener('DOMContentLoaded', () => {
         closeDeleteModal();
       } else if (backupModal && !backupModal.classList.contains('hidden')) {
         closeBackupModal();
+      } else if (integrityModal && !integrityModal.classList.contains('hidden')) {
+        closeIntegrityModal();
       } else if (uploadModal && !uploadModal.classList.contains('hidden')) {
         closeUploadModal();
       } else if (wikiView && !wikiView.classList.contains('hidden')) {

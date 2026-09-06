@@ -668,11 +668,70 @@ npm start</pre>
     </div>
   </div>
 
+  <!-- MODAL DE VERIFICACIÓN DE INTEGRIDAD SHA-256 -->
+  <div class="modal-backdrop hidden" id="integrity-modal" role="dialog" aria-modal="true" aria-labelledby="integrity-modal-title">
+    <div class="modal-box integrity-modal-box">
+      <div class="modal-header">
+        <div>
+          <h3 id="integrity-modal-title">Verificación de Integridad SHA-256</h3>
+          <span class="wiki-subtitle" id="integrity-modal-subtitle">Auditoría criptográfica en tiempo real</span>
+        </div>
+        <button class="btn-close-modal" id="btn-close-integrity-modal" aria-label="Cerrar">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="integrity-summary-card">
+          <div class="integrity-summary-header">
+            <div class="integrity-target-info">
+              <h4 id="integrity-book-title">Título del Libro</h4>
+              <span class="integrity-meta-line" id="integrity-book-meta">v1.0.0 • Código: BK-01</span>
+            </div>
+            <span class="integrity-status-pill" id="integrity-global-status">Verificando...</span>
+          </div>
+
+          <div class="integrity-hash-box">
+            <span class="hash-label">Hash SHA-256 Canónico de la Publicación:</span>
+            <div class="hash-row">
+              <code class="hash-code" id="integrity-composite-hash">--</code>
+              <button class="btn-copy-hash" id="btn-copy-book-hash" title="Copiar hash SHA-256">Copiar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="integrity-chapters-section">
+          <h5 class="integrity-section-title">Huellas Criptográficas por Capítulo</h5>
+          <div class="integrity-chapters-table-wrap">
+            <table class="integrity-table">
+              <thead>
+                <tr>
+                  <th>Capítulo</th>
+                  <th>Archivo</th>
+                  <th>Hash SHA-256</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="integrity-chapters-tbody">
+                <!-- Se rellena dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="alert-message hidden" id="integrity-modal-alert"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btn-reverify-integrity">🔄 Re-verificar</button>
+        <button class="btn-primary" id="btn-close-integrity-btn">Aceptar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- SCRIPTS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="/js/reader.js?v=11"></script>
-  <script src="/js/app.js?v=18"></script>
+  <script src="/js/app.js?v=20"></script>
 </body>
 </html>
 
