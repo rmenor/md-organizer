@@ -185,9 +185,6 @@ function securityScanZip(zipFilePath, zip, entries) {
         { isSecurityError: true }
       );
     }
-    if (!entry.isDirectory && ext === '.svg') {
-      throw Object.assign(new Error(`SVG no permitido en el ZIP: "${name}".`), { isSecurityError: true });
-    }
 
     // 8. Null bytes and path traversal in entry name
     if (name.includes('\0')) {
@@ -207,10 +204,40 @@ function securityScanZip(zipFilePath, zip, entries) {
 
 function validateAssetMagic(entry, data) {
   const ext = path.extname(entry.entryName).toLowerCase();
-  if (!ALLOWED_ASSET_EXTS.has(ext) || ext === '.svg') return;
+  if (!ALLOWED_ASSET_EXTS.has(ext)) return;
   if (!Buffer.isBuffer(data)) {
     throw Object.assign(new Error(`No se pudo leer el asset "${entry.entryName}".`), { isSecurityError: true });
   }
+
+  // Validación de seguridad para imágenes vectoriales SVG (prevención XSS / XXE)
+  if (ext === '.svg') {
+    const text = data.toString('utf8');
+    if (!/<svg[\s\S]*?>/i.test(text)) {
+      throw Object.assign(new Error(`El archivo "${entry.entryName}" no es un SVG válido.`), { isSecurityError: true });
+    }
+    const dangerousPatterns = [
+      /<script\b/i,
+      /\bon\w+\s*=/i,                       // onload=, onerror=, onclick=, etc.
+      /javascript:/i,
+      /data:text\/html/i,
+      /<foreignObject\b/i,
+      /<iframe\b/i,
+      /<object\b/i,
+      /<embed\b/i,
+      /<!ENTITY/i,                           // XXE
+      /<use[^>]+href\s*=\s*['"]?https?:/i    // Carga de recursos remotos no seguros
+    ];
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(text)) {
+        throw Object.assign(
+          new Error(`SVG inseguro detectado en "${entry.entryName}" (contiene scripts o elementos no permitidos).`),
+          { isSecurityError: true }
+        );
+      }
+    }
+    return;
+  }
+
   const startsWith = (bytes, offset = 0) => bytes.every((value, index) => data[offset + index] === value);
   const valid = ext === '.png'
     ? startsWith([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
@@ -821,7 +848,7 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
         if (!coverImagePath && (
           (coverBasename && safeName.toLowerCase() === coverBasename) ||
           (metadata.cover && asset.entryName.includes(metadata.cover)) ||
-          /(cover|portada)\.(png|jpe?g|webp)$/i.test(safeName)
+          /(cover|portada)\.(png|jpe?g|webp|svg)$/i.test(safeName)
         )) {
           coverImagePath = path.join('assets', safeName);
         }
