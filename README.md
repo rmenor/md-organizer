@@ -250,7 +250,7 @@ A continuación se muestra una comparación general de capacidades entre MD Orga
 
 | Proyecto | Markdown | Libro/capítulos | ZIP paquete | Biblioteca | Reader web | DB | Versionado | Importación dinámica |
 |---|---|---|---|---|---|---|---|---|
-| Tu aplicación | ✅ | ✅ | ✅ | ✅ | ✅ | SQLite | ✅ | ✅ |
+| MD Organizer | ✅ | ✅ | ✅ | ✅ | ✅ | SQLite | ✅ | ✅ |
 | Gitshelf | ✅ | ✅ | ✅ | ✅ | ✅ | Git | parcial | ⚠️ |
 | MDZ | ✅ | ⚠️ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | BookStack | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | parcial | ⚠️ |
