@@ -140,6 +140,7 @@ body {
   align-items: center;
   gap: 0.75rem;
   min-width: 120px;
+  padding-left: 59px;
 }
 
 /* Decoración de 3 libritos minimalistas (Rojo, Amarillo, Verde) */
@@ -151,6 +152,10 @@ body {
   padding: 2px 4px;
   border-radius: 4px;
   transition: opacity 0.15s ease;
+  position: absolute;
+  left: var(--safe-area-inset-left);
+  top: calc(var(--safe-area-inset-top) + (var(--topbar-height) / 2));
+  transform: translateY(-50%);
 }
 
 .window-decor:hover {
@@ -617,7 +622,7 @@ body {
 .book-cover-wrap {
   position: relative;
   width: 100%;
-  aspect-ratio: 2 / 3;
+  aspect-ratio: 1 / 1;
   background-color: #1a1a1a;
   border: 1px solid var(--app-border);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
@@ -1917,7 +1922,7 @@ p code, li code, td code {
   .book-cover-wrap {
     flex: 0 0 38%;
     width: auto;
-    aspect-ratio: 2 / 3;
+    aspect-ratio: 1 / 1;
     padding: 0.75rem 0.5rem;
   }
 
@@ -1986,6 +1991,10 @@ p code, li code, td code {
 
   .topbar-left, .topbar-right {
     min-width: 48px;
+  }
+
+  .topbar-left {
+    padding-left: 0;
   }
 
   /* Ocultar el título de la barra en móvil para evitar que se rompa */

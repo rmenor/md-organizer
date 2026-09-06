@@ -28,6 +28,15 @@ const {
 const { processZipFile, safeResolvePath, securityScanZip } = require('../src/processor');
 const AdmZip = require('adm-zip');
 
+test('Las portadas usan una proporción cuadrada', () => {
+  const styles = fs.readFileSync(path.join(__dirname, '..', 'public/css/styles.css'), 'utf8');
+  const coverWrap = styles.match(/^\s*\.book-cover-wrap\s*\{[^}]*\}/gm) || [];
+
+  assert.equal(coverWrap.length, 2);
+  assert.ok(coverWrap.every((rule) => /aspect-ratio:\s*1\s*\/\s*1/.test(rule)));
+  assert.doesNotMatch(coverWrap.join('\n'), /aspect-ratio:\s*2\s*\/\s*3/);
+});
+
 test('Capa de Base de Datos (SQLite3)', async (t) => {
   await t.test('Crea y recupera secciones y subsecciones', () => {
     const sec = getOrCreateSection('Tecnología');
