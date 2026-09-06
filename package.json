@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test tests/test_app.js",
+    "test": "node --test tests/test_*.js",
     "generate-samples": "node examples/generate_samples.js",
     "seed": "node -e \"const { processZipFile } = require('./src/processor'); const path = require('path'); (async () => { await processZipFile(path.join('examples', '1_libro_codigo_limpio_v1.zip'), '1_libro_codigo_limpio_v1.zip'); await processZipFile(path.join('examples', '4_sqlite_guia_auto.zip'), '4_sqlite_guia_auto.zip'); await processZipFile(path.join('examples', '5_especificacion_mdz_book.mdz'), '5_especificacion_mdz_book.mdz'); console.log('📚 Biblioteca inicializada con libros de ejemplo (.zip y .mdz).'); })();\""
   },

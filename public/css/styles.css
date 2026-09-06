@@ -1771,6 +1771,26 @@ p code, li code, td code {
   font-size: 0.9rem;
 }
 
+.wiki-cover-example figure {
+  margin: 1rem 0 0;
+  max-width: 360px;
+}
+
+.wiki-cover-example img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--app-border);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+}
+
+.wiki-cover-example figcaption {
+  margin-top: 0.75rem;
+  color: var(--app-text-muted);
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
 
 .rule-box {
   background-color: var(--app-purple-bg);
@@ -2954,6 +2974,297 @@ p code, li code, td code {
   .nav-text-short {
     display: inline;
   }
+}
+
+/* ==========================================================================
+   LECTOR: MARCADORES, RESALTADOS Y NOTAS
+   ========================================================================== */
+
+.btn-reader-bookmark {
+  color: var(--app-text-muted);
+  transition: color 0.15s, transform 0.15s;
+}
+
+.btn-reader-bookmark:hover {
+  color: var(--app-purple-active);
+}
+
+.btn-reader-bookmark.active {
+  color: #fbbf24;
+}
+
+.btn-reader-bookmark.active svg {
+  fill: #fbbf24;
+}
+
+/* Pestañas y Paneles del Drawer */
+.reader-drawer-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--app-border-subtle);
+  background-color: var(--app-bg-surface);
+  flex-shrink: 0;
+}
+
+.drawer-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.65rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--app-text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.drawer-tab-btn:hover {
+  color: var(--app-text-main);
+}
+
+.drawer-tab-btn.active {
+  color: var(--app-purple-active);
+  border-bottom-color: var(--app-purple-active);
+}
+
+.drawer-tab-badge {
+  background: var(--app-purple-active);
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+}
+
+.drawer-panes-container {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.drawer-pane-header {
+  padding: 0.55rem 1rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--app-text-muted);
+  background: var(--app-bg-surface);
+  border-bottom: 1px solid var(--app-border-subtle);
+}
+
+.drawer-items-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+}
+
+.drawer-item {
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--app-border-subtle);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.drawer-item:hover {
+  background: var(--app-bg-tile-hover);
+}
+
+.drawer-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.drawer-item-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--app-text-main);
+}
+
+.drawer-item-text {
+  font-size: 0.82rem;
+  color: var(--app-text-muted);
+  margin-top: 0.25rem;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.drawer-item-note {
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--app-purple-light);
+  margin-top: 0.2rem;
+}
+
+.btn-item-delete {
+  background: transparent;
+  border: none;
+  color: var(--app-text-muted);
+  cursor: pointer;
+  padding: 0.2rem;
+  font-size: 0.85rem;
+  border-radius: 4px;
+  opacity: 0.6;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.btn-item-delete:hover {
+  opacity: 1;
+  color: #ef4444;
+}
+
+.drawer-empty-state {
+  padding: 2rem 1.25rem;
+  text-align: center;
+  color: var(--app-text-muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* Resaltados de texto inline */
+.reader-highlight {
+  border-radius: 3px;
+  padding: 0.1rem 0.15rem;
+  cursor: pointer;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.reader-highlight.highlight-yellow {
+  background-color: rgba(234, 179, 8, 0.38);
+  color: inherit;
+}
+
+.reader-highlight.highlight-green {
+  background-color: rgba(34, 197, 94, 0.35);
+  color: inherit;
+}
+
+.reader-highlight.highlight-blue {
+  background-color: rgba(59, 130, 246, 0.35);
+  color: inherit;
+}
+
+.reader-highlight.highlight-pink {
+  background-color: rgba(244, 114, 182, 0.38);
+  color: inherit;
+}
+
+.reader-highlight:hover {
+  filter: brightness(1.15);
+}
+
+.highlight-pulse {
+  animation: highlight-pulse-anim 1.5s ease-out;
+}
+
+@keyframes highlight-pulse-anim {
+  0% {
+    box-shadow: 0 0 0 4px rgba(155, 81, 224, 0.8);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(155, 81, 224, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(155, 81, 224, 0);
+  }
+}
+
+/* Popover flotante de selección y notas */
+.reader-selection-popover {
+  position: fixed;
+  z-index: 150;
+  background: var(--app-bg-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 240px;
+  max-width: 320px;
+  animation: popoverFadeIn 0.15s ease-out;
+}
+
+@keyframes popoverFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.popover-color-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.1s, border-color 0.1s;
+}
+
+.btn-color-swatch[data-color="yellow"] { background: #eab308; }
+.btn-color-swatch[data-color="green"] { background: #22c55e; }
+.btn-color-swatch[data-color="blue"] { background: #3b82f6; }
+.btn-color-swatch[data-color="pink"] { background: #ec4899; }
+.btn-color-swatch:hover { transform: scale(1.15); }
+.btn-color-swatch.active { border-color: #ffffff; transform: scale(1.15); }
+
+.popover-input-row {
+  display: flex;
+  gap: 0.4rem;
+}
+
+#popover-note-input {
+  flex: 1;
+  background: var(--app-bg-tile);
+  border: 1px solid var(--app-border-subtle);
+  border-radius: 6px;
+  color: var(--app-text-main);
+  font-size: 0.8rem;
+  padding: 0.35rem 0.5rem;
+  outline: none;
+}
+
+#popover-note-input:focus {
+  border-color: var(--app-purple-active);
+}
+
+.btn-popover-save {
+  background: var(--app-purple-active);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn-popover-save:hover {
+  opacity: 0.9;
 }
 
 .hidden {

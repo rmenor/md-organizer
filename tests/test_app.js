@@ -95,6 +95,8 @@ test('La pestaña Documentación Completa carga la wiki aunque el panel tenga pl
 
 test('La pestaña Cómo crear libros ofrece herramientas seguras y su flujo de preparación', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'public/index.html'), 'utf8');
+  const cover = fs.readFileSync(path.join(__dirname, '..', 'public/assets/portada-libro-ejemplo.svg'), 'utf8');
+  const cleanCodeCover = fs.readFileSync(path.join(__dirname, '..', 'public/assets/portada-codigo-limpio.svg'), 'utf8');
   const tabs = html.match(/<button class="wiki-tab-chip"[^>]*>.*?<\/button>/g) || [];
   const fullIndex = tabs.findIndex((tab) => tab.includes('data-wiki-tab="full"'));
   const createIndex = tabs.findIndex((tab) => tab.includes('data-wiki-tab="create"'));
@@ -107,6 +109,35 @@ test('La pestaña Cómo crear libros ofrece herramientas seguras y su flujo de p
   assert.match(html, /https:\/\/obsidian\.md\/[^>]*target="_blank" rel="noopener noreferrer"/);
   assert.match(html, /https:\/\/typora\.io\/[^>]*target="_blank" rel="noopener noreferrer"/);
   assert.match(html, /escribir en Markdown[\s\S]*organizar capítulos, portada y <code>metadata\.json<\/code>[\s\S]*previsualizar\/exportar[\s\S]*comprimir/);
+  assert.match(html, /src="\/assets\/portada-libro-ejemplo\.svg" alt="Portada de muestra/);
+  assert.match(html, /Una portada visual de ejemplo/);
+  assert.match(cover, /<svg[^>]*viewBox="0 0 720 720"/);
+  assert.match(cover, /<title id="titulo">Portada de muestra/);
+  assert.doesNotMatch(cover, /(?:href|xlink:href)=["']https?:\/\//);
+  assert.match(html, /El Arte del Código Limpio[\s\S]*portada-codigo-limpio\.svg[\s\S]*Nombres con Significado[\s\S]*Funciones Pequeñas y Enfocadas/);
+  assert.match(html, /portada-codigo-limpio\.svg" alt="[^"]+" title="[^"]+"/);
+  assert.match(cleanCodeCover, /<title id="titulo">Portada de El Arte del Código Limpio<\/title>/);
+  assert.match(cleanCodeCover, /ADA LOVELACE &amp; MARTIN FOWLER/);
+  assert.match(cleanCodeCover, /NOMBRES CON SIGNIFICADO/);
+  assert.match(cleanCodeCover, /<desc id="descripcion">[\s\S]+<\/desc>/);
+  assert.doesNotMatch(cleanCodeCover, /(?:href|xlink:href)=["']https?:\/\//);
+});
+
+test('El libro instalado El Arte del Código Limpio tiene una portada PNG válida y coherente', () => {
+  const bookDir = path.join(__dirname, '..', 'library/ingenieria-de-software/buenas-practicas/el-arte-del-codigo-limpio-mtp1dgtg');
+  const metadata = JSON.parse(fs.readFileSync(path.join(bookDir, 'metadata.json'), 'utf8'));
+  const coverPath = path.join(bookDir, metadata.cover);
+  const png = fs.readFileSync(coverPath);
+
+  assert.equal(metadata.title, 'El Arte del Código Limpio');
+  assert.equal(metadata.author, 'Ada Lovelace & Martin Fowler');
+  assert.ok(fs.existsSync(coverPath));
+  assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.equal(png.toString('ascii', 12, 16), 'IHDR');
+  assert.equal(png.readUInt32BE(16), png.readUInt32BE(20), 'La portada debe ser cuadrada');
+  assert.ok(png.readUInt32BE(16) > 1, 'La portada no puede ser un placeholder 1x1');
+  assert.match(fs.readFileSync(path.join(bookDir, '01_01_nombres_con_significado.md'), 'utf8'), /Nombres con Significado/);
+  assert.match(fs.readFileSync(path.join(bookDir, '02_02_funciones_pequenas.md'), 'utf8'), /Funciones Pequeñas/);
 });
 
 test('Capa de Base de Datos (SQLite3)', async (t) => {
@@ -877,4 +908,3 @@ test.after(() => {
   if (fs.existsSync(TEST_DB_PATH)) fs.unlinkSync(TEST_DB_PATH);
   if (fs.existsSync(TEST_LIB_PATH)) fs.rmSync(TEST_LIB_PATH, { recursive: true, force: true });
 });
-

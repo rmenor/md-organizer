@@ -10,7 +10,7 @@ strict_tdd: true
 
 testing:
   strict_tdd: true
-  detected: 2026-09-05
+  detected: 2026-09-06
   runner:
     command: "npm test"
     framework: "node:test"

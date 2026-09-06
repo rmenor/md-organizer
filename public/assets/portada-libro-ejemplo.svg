@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720" role="img" aria-labelledby="titulo descripcion">
+  <title id="titulo">Portada de muestra de un libro Markdown</title>
+  <desc id="descripcion">Composición editorial abstracta con el título Entre páginas y una forma de libro abierto.</desc>
+  <defs>
+    <linearGradient id="fondo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#15122d"/>
+      <stop offset="0.55" stop-color="#30215f"/>
+      <stop offset="1" stop-color="#d15b77"/>
+    </linearGradient>
+    <linearGradient id="papel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff8e8"/>
+      <stop offset="1" stop-color="#e8d8bd"/>
+    </linearGradient>
+    <filter id="sombra" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#0b0918" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect width="720" height="720" fill="url(#fondo)"/>
+  <circle cx="595" cy="118" r="180" fill="#f8c76b" opacity="0.16"/>
+  <circle cx="94" cy="630" r="220" fill="#6de0d0" opacity="0.12"/>
+  <path d="M0 536 C160 456 240 618 382 536 S600 470 720 548 V720 H0Z" fill="#0e0c22" opacity="0.35"/>
+
+  <g fill="none" stroke="#f8d68f" stroke-width="2" opacity="0.55">
+    <path d="M72 108h116M72 124h70"/>
+    <path d="M545 602h102M574 618h73"/>
+  </g>
+
+  <g filter="url(#sombra)" transform="translate(104 202) rotate(-5 256 170)">
+    <path d="M0 26 Q124 0 254 42 V350 Q126 310 0 336Z" fill="url(#papel)"/>
+    <path d="M254 42 Q384 0 512 26 V336 Q386 310 254 350Z" fill="#f6ead5"/>
+    <path d="M254 42V350" stroke="#b69e82" stroke-width="5"/>
+    <path d="M38 86 Q132 68 220 92 M38 112 Q132 94 220 118 M292 92 Q382 68 474 86 M292 118 Q382 94 474 112" stroke="#c6b49d" stroke-width="4" opacity="0.7"/>
+    <path d="M88 244 Q162 182 226 244" stroke="#d15b77" stroke-width="14" stroke-linecap="round"/>
+    <path d="M282 244 Q350 182 424 244" stroke="#5a42a8" stroke-width="14" stroke-linecap="round"/>
+  </g>
+
+  <g fill="#fff8e8" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif">
+    <text x="360" y="92" font-size="18" letter-spacing="6" opacity="0.82">EDICIÓN DE MUESTRA</text>
+    <text x="360" y="475" font-size="58" font-weight="bold">Entre páginas</text>
+    <text x="360" y="516" font-size="21" letter-spacing="4" opacity="0.88">IDEAS QUE TOMAN FORMA</text>
+  </g>
+  <text x="360" y="650" fill="#fff8e8" font-family="Georgia, 'Times New Roman', serif" font-size="17" text-anchor="middle" opacity="0.78">MD ORGANIZER · PORTADA DE EJEMPLO</text>
+</svg>

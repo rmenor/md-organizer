@@ -302,6 +302,22 @@
 
           <div class="wiki-card-step">
             <div class="step-badge">3</div>
+            <div class="wiki-cover-example">
+              <h4>Portada del ejemplo real: El Arte del Código Limpio</h4>
+              <figure>
+                <img src="/assets/portada-codigo-limpio.svg" alt="Portada de El Arte del Código Limpio con un editor de código ordenado" title="Portada de El Arte del Código Limpio">
+                <figcaption>Esta carátula encaja con el libro <strong>El Arte del Código Limpio</strong>, de Ada Lovelace &amp; Martin Fowler: el editor ordenado y las funciones pequeñas aluden a sus capítulos «Nombres con Significado» y «Funciones Pequeñas y Enfocadas». Es una fuente editable; el libro instalado usa la versión PNG en <code>assets/cover.png</code>.</figcaption>
+              </figure>
+              <figure>
+                <img src="/assets/portada-libro-ejemplo.svg" alt="Portada de muestra de un libro Markdown titulada Entre páginas" title="Portada genérica de muestra">
+                <figcaption>Una portada visual de ejemplo para ver cómo puede quedar tu libro. Es un recurso SVG autocontenido que puedes sustituir por tu propia imagen en <code>assets/</code>.</figcaption>
+              </figure>
+              <p>La primera propuesta es específica del libro real; la segunda sirve como referencia genérica para comparar.</p>
+            </div>
+          </div>
+
+          <div class="wiki-card-step">
+            <div class="step-badge">4</div>
             <div>
               <h4>Previsualiza, exporta y comprime al final</h4>
               <ol>
@@ -424,6 +440,13 @@ npm start</pre>
         <button class="btn-reader-action" id="font-decrease" title="Reducir tamaño de letra">A-</button>
         <button class="btn-reader-action" id="font-increase" title="Aumentar tamaño de letra">A+</button>
 
+        <!-- Botón para marcar capítulo actual -->
+        <button class="btn-reader-action btn-reader-bookmark" id="btn-reader-bookmark" title="Marcar este capítulo" aria-label="Marcar capítulo">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </button>
+
         <!-- Botón para abrir índice de capítulos -->
         <button class="btn-reader-toc" id="btn-toggle-toc" title="Índice de capítulos" aria-label="Abrir capítulos">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -448,42 +471,88 @@ npm start</pre>
           <button class="btn-close-sheet" id="btn-close-toc" aria-label="Cerrar capítulos y opciones">✕</button>
         </div>
 
-        <!-- Opciones de Lectura y Apariencia en el Sidebar -->
-        <div class="toc-reading-options">
-          <div class="toc-option-block">
-            <span class="toc-block-label">Tema de Lectura</span>
-            <div class="toc-theme-swatches">
-              <button class="toc-theme-btn active" data-theme="dark" title="Modo Oscuro">
-                <span class="toc-theme-dot theme-dot-dark"></span>
-                <span>Oscuro</span>
-              </button>
-              <button class="toc-theme-btn" data-theme="sepia" title="Modo Sepia">
-                <span class="toc-theme-dot theme-dot-sepia"></span>
-                <span>Sepia</span>
-              </button>
-              <button class="toc-theme-btn" data-theme="light" title="Modo Claro">
-                <span class="toc-theme-dot theme-dot-light"></span>
-                <span>Claro</span>
-              </button>
+        <!-- Pestañas del Drawer: Índice, Marcadores y Notas -->
+        <div class="reader-drawer-tabs">
+          <button class="drawer-tab-btn active" data-drawer-tab="toc">
+            <span>Índice</span>
+          </button>
+          <button class="drawer-tab-btn" data-drawer-tab="bookmarks">
+            <span>Marcadores</span>
+            <span class="drawer-tab-badge hidden" id="badge-bookmarks-count">0</span>
+          </button>
+          <button class="drawer-tab-btn" data-drawer-tab="notes">
+            <span>Notas</span>
+            <span class="drawer-tab-badge hidden" id="badge-notes-count">0</span>
+          </button>
+        </div>
+
+        <div class="drawer-panes-container">
+          <!-- Panel 1: Índice (TOC) y Opciones -->
+          <div class="drawer-pane active" id="drawer-pane-toc">
+            <!-- Opciones de Lectura y Apariencia en el Sidebar -->
+            <div class="toc-reading-options">
+              <div class="toc-option-block">
+                <span class="toc-block-label">Tema de Lectura</span>
+                <div class="toc-theme-swatches">
+                  <button class="toc-theme-btn active" data-theme="dark" title="Modo Oscuro">
+                    <span class="toc-theme-dot theme-dot-dark"></span>
+                    <span>Oscuro</span>
+                  </button>
+                  <button class="toc-theme-btn" data-theme="sepia" title="Modo Sepia">
+                    <span class="toc-theme-dot theme-dot-sepia"></span>
+                    <span>Sepia</span>
+                  </button>
+                  <button class="toc-theme-btn" data-theme="light" title="Modo Claro">
+                    <span class="toc-theme-dot theme-dot-light"></span>
+                    <span>Claro</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="toc-option-block">
+                <span class="toc-block-label">Tamaño de Letra</span>
+                <div class="toc-font-row">
+                  <button class="btn-reader-action btn-font-dec" id="sidebar-font-decrease" title="Reducir tamaño de letra">A-</button>
+                  <span class="reader-font-indicator" id="sidebar-font-indicator">100%</span>
+                  <button class="btn-reader-action btn-font-inc" id="sidebar-font-increase" title="Aumentar tamaño de letra">A+</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="toc-chapters-label">
+              <span>Capítulos</span>
+            </div>
+            <ul id="reader-chapters-list" class="chapters-list">
+              <!-- Capítulos generados dinámicamente -->
+            </ul>
+          </div>
+
+          <!-- Panel 2: Marcadores -->
+          <div class="drawer-pane hidden" id="drawer-pane-bookmarks">
+            <div class="drawer-pane-header">
+              <span>Marcadores guardados</span>
+            </div>
+            <ul id="reader-bookmarks-list" class="drawer-items-list">
+              <!-- Lista de marcadores generada dinámicamente -->
+            </ul>
+            <div class="drawer-empty-state hidden" id="bookmarks-empty-state">
+              <p>No tienes marcadores en este libro. Pulsa el icono de marcador en la barra superior para guardar tu posición.</p>
             </div>
           </div>
 
-          <div class="toc-option-block">
-            <span class="toc-block-label">Tamaño de Letra</span>
-            <div class="toc-font-row">
-              <button class="btn-reader-action btn-font-dec" id="sidebar-font-decrease" title="Reducir tamaño de letra">A-</button>
-              <span class="reader-font-indicator" id="sidebar-font-indicator">100%</span>
-              <button class="btn-reader-action btn-font-inc" id="sidebar-font-increase" title="Aumentar tamaño de letra">A+</button>
+          <!-- Panel 3: Notas y Anotaciones -->
+          <div class="drawer-pane hidden" id="drawer-pane-notes">
+            <div class="drawer-pane-header">
+              <span>Notas y resaltados</span>
+            </div>
+            <ul id="reader-notes-list" class="drawer-items-list">
+              <!-- Lista de notas generada dinámicamente -->
+            </ul>
+            <div class="drawer-empty-state hidden" id="notes-empty-state">
+              <p>No hay resaltados ni notas guardadas. Selecciona texto en la lectura para añadir anotaciones.</p>
             </div>
           </div>
         </div>
-
-        <div class="toc-chapters-label">
-          <span>Capítulos</span>
-        </div>
-        <ul id="reader-chapters-list" class="chapters-list">
-          <!-- Capítulos generados dinámicamente -->
-        </ul>
       </aside>
 
       <!-- Cuerpo del Lector tipográfico -->
@@ -500,6 +569,20 @@ npm start</pre>
           </div>
         </div>
       </article>
+    </div>
+
+    <!-- POPOVER FLOTANTE DE SELECCIÓN Y NOTAS -->
+    <div id="reader-selection-popover" class="reader-selection-popover hidden" role="dialog" aria-label="Anotar selección">
+      <div class="popover-color-row">
+        <button class="btn-color-swatch active" data-color="yellow" title="Resaltar amarillo" aria-label="Resaltar amarillo"></button>
+        <button class="btn-color-swatch" data-color="green" title="Resaltar verde" aria-label="Resaltar verde"></button>
+        <button class="btn-color-swatch" data-color="blue" title="Resaltar azul" aria-label="Resaltar azul"></button>
+        <button class="btn-color-swatch" data-color="pink" title="Resaltar rosa" aria-label="Resaltar rosa"></button>
+      </div>
+      <div class="popover-input-row">
+        <input type="text" id="popover-note-input" placeholder="Añadir nota opcional..." autocomplete="off">
+        <button class="btn-popover-save" id="btn-save-annotation" title="Guardar anotación">Resaltar</button>
+      </div>
     </div>
 
     <!-- Paginación de navegación de capítulos (anclada abajo del todo) -->
@@ -925,7 +1008,10 @@ npm start</pre>
   <!-- SCRIPTS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-  <script src="/js/reader.js?v=11"></script>
+  <script src="/js/storage.js?v=1"></script>
+  <script src="/js/annotations.js?v=1"></script>
+  <script src="/js/bookmarks.js?v=1"></script>
+  <script src="/js/reader.js?v=12"></script>
   <script src="/js/app.js?v=22"></script>
 </body>
 </html>
