@@ -90,6 +90,33 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/'/g, '&#039;');
   }
 
+  function safeMarkdownFragment(markdown) {
+    const parsed = new DOMParser().parseFromString(marked.parse(String(markdown || '')), 'text/html');
+    const allowed = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'UL', 'OL', 'LI', 'A', 'IMG', 'PRE', 'CODE', 'BLOCKQUOTE', 'EM', 'STRONG', 'DEL', 'BR', 'HR']);
+    const fragment = document.createDocumentFragment();
+    const safeUrl = (value, image = false) => {
+      try {
+        const url = new URL(value, window.location.origin);
+        if (url.protocol === 'http:' || url.protocol === 'https:') return url.href;
+        if (url.origin === window.location.origin && (value.startsWith('/') || value.startsWith('./'))) return url.pathname + url.search + url.hash;
+      } catch (_) {}
+      return image ? '' : '#';
+    };
+    const copy = (node, parent) => {
+      if (node.nodeType === Node.TEXT_NODE) { parent.appendChild(document.createTextNode(node.nodeValue)); return; }
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      if (!allowed.has(node.tagName)) { [...node.childNodes].forEach(child => copy(child, parent)); return; }
+      const out = document.createElement(node.tagName.toLowerCase());
+      if (node.tagName === 'A') { const href = safeUrl(node.getAttribute('href') || ''); if (href !== '#') out.href = href; }
+      if (node.tagName === 'IMG') { const src = safeUrl(node.getAttribute('src') || '', true); if (!src) return; out.src = src; out.alt = node.getAttribute('alt') || ''; }
+      if (node.tagName === 'CODE' && node.className) out.className = node.className.replace(/[^a-zA-Z0-9 _-]/g, '');
+      [...node.childNodes].forEach(child => copy(child, out));
+      parent.appendChild(out);
+    };
+    [...parsed.body.childNodes].forEach(node => copy(node, fragment));
+    return fragment;
+  }
+
   // Iconos acordes a la temática de cada sección
   function getSectionIcon(name) {
     const n = (name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -328,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const card = document.createElement('div');
       card.className = 'book-grid-card';
       card.tabIndex = 0;
-      card.title = `${book.title}`;
+      card.title = String(book.title || '');
 
       const coverClass = coverPalette[index % coverPalette.length];
       const hasRealCover = Boolean(book.cover_image);
@@ -336,23 +363,21 @@ document.addEventListener('DOMContentLoaded', () => {
         ? `/api/books/${book.id}/assets/${encodeURIComponent(book.cover_image.replace(/^assets\//, ''))}`
         : '';
 
-      // Progreso de lectura guardado en localStorage
-      const bookProgress = (typeof Reader !== 'undefined' && Reader.getProgress) ? Reader.getProgress(book.id) : null;
-      const progressBadge = bookProgress && (bookProgress.chapterIndex > 0 || bookProgress.scrollTop > 80)
-        ? `<span class="book-progress-badge" title="Progreso: Capítulo ${bookProgress.chapterIndex + 1}">Cap. ${bookProgress.chapterIndex + 1}</span>`
-        : '';
-
       card.innerHTML = `
         <div class="book-cover-wrap ${coverClass}">
-          ${hasRealCover ? `<img src="${coverImgSrc}" alt="${book.title}" class="book-real-cover" onerror="this.remove()">` : ''}
+          ${hasRealCover ? `<img src="${escapeHtml(coverImgSrc)}" alt="${escapeHtml(book.title)}" class="book-real-cover">` : ''}
           <div class="book-cover-inner">
-            <span class="book-cover-title-emboss">${book.title}</span>
+          <span class="book-cover-title-emboss">${escapeHtml(book.title)}</span>
           </div>
-          ${progressBadge}
-          <button class="btn-book-delete" data-book-id="${book.id}" title="Eliminar publicación">✕</button>
+          <button class="btn-book-delete" data-book-id="${escapeHtml(book.id)}" title="Eliminar publicación">✕</button>
         </div>
-        <div class="book-title-label">${book.title}</div>
+        <div class="book-card-info">
+          <div class="book-title-label">${escapeHtml(book.title)}</div>
+        </div>
       `;
+
+      const realCover = card.querySelector('.book-real-cover');
+      realCover?.addEventListener('error', () => realCover.remove(), { once: true });
 
       card.querySelector('.btn-book-delete').addEventListener('click', (e) => {
         e.stopPropagation();
@@ -394,11 +419,11 @@ document.addEventListener('DOMContentLoaded', () => {
       item.className = 'updates-card-item';
       item.innerHTML = `
         <div class="update-book-info">
-          <h4>${book.title}</h4>
+          <h4>${escapeHtml(book.title)}</h4>
           <div class="update-book-meta">
-            <span>Código: <strong>${book.code}</strong></span> · 
-            <span>Versión: <strong>v${book.version}</strong></span> · 
-            <span>Fecha: <strong>${book.publication_date ? book.publication_date.substring(0, 10) : 'N/A'}</strong></span>
+            <span>Código: <strong>${escapeHtml(book.code)}</strong></span> ·
+            <span>Versión: <strong>v${escapeHtml(book.version)}</strong></span> ·
+            <span>Fecha: <strong>${escapeHtml(book.publication_date ? book.publication_date.substring(0, 10) : 'N/A')}</strong></span>
           </div>
         </div>
         <div class="update-status-pill">✓ Instalado</div>
@@ -745,13 +770,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch('/api/wiki');
       if (res.ok) {
         const data = await res.json();
-        wikiMarkdownContainer.innerHTML = marked.parse(data.content);
+        wikiMarkdownContainer.replaceChildren(safeMarkdownFragment(data.content));
         return;
       }
       const resFallback = await fetch('/WIKI_COMO_HACER_LIBROS.md');
       if (!resFallback.ok) throw new Error();
       const md = await resFallback.text();
-      wikiMarkdownContainer.innerHTML = marked.parse(md);
+      wikiMarkdownContainer.replaceChildren(safeMarkdownFragment(md));
     } catch {
       wikiMarkdownContainer.innerHTML = '<p>Consulta la pestaña Guía Rápida para conocer la estructura de archivos.</p>';
     }

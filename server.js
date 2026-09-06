@@ -47,7 +47,8 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + '-' + file.originalname);
+    const safeOriginalName = path.basename(file.originalname || 'upload.zip').replace(/[\\/\0]/g, '_');
+    cb(null, uniqueSuffix + '-' + safeOriginalName);
   }
 });
 
@@ -97,12 +98,16 @@ app.get('/api/books/:id/assets/:assetName', (req, res) => {
 
     // Sanitizar nombre del asset para evitar traversal
     const safeAssetName = path.basename(req.params.assetName);
-    const assetPath = path.join(book.storage_path, 'assets', safeName = safeAssetName);
+    if (safeAssetName !== req.params.assetName || /[\\/\0]/.test(req.params.assetName)) {
+      return res.status(400).json({ error: 'Nombre de asset no válido' });
+    }
+    const assetPath = path.join(book.storage_path, 'assets', safeAssetName);
 
     if (!fs.existsSync(assetPath)) {
       return res.status(404).json({ error: 'Asset no encontrado' });
     }
 
+    res.set('X-Content-Type-Options', 'nosniff');
     res.sendFile(assetPath);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -217,6 +222,10 @@ app.post('/api/upload', (req, res, next) => {
         isVersionConflict: true,
         existingBook: err.existingBook
       });
+    }
+
+    if (err.isSecurityError) {
+      return res.status(400).json({ error: 'El archivo fue rechazado por motivos de seguridad.' });
     }
 
     if (err.isValidationError) {

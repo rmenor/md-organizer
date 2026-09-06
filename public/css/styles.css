@@ -1900,6 +1900,51 @@ p code, li code, td code {
   .category-grid {
     grid-template-columns: repeat(3, 1fr);
   }
+
+  .books-container {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .book-grid-card {
+    flex-direction: row;
+    min-width: 0;
+  }
+
+  .book-cover-wrap {
+    flex: 0 0 38%;
+    width: auto;
+    aspect-ratio: 2 / 3;
+    padding: 0.75rem 0.5rem;
+  }
+
+  .book-cover-inner {
+    display: none;
+  }
+
+  .book-card-info {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    flex: 1 1 auto;
+    padding: 0 0.85rem;
+    background: var(--app-bg-surface);
+    border: 1px solid var(--app-border);
+    border-left: 0;
+  }
+
+  .book-title-label {
+    min-width: 0;
+    width: 100%;
+    margin-top: 0;
+    overflow-wrap: anywhere;
+    text-align: left;
+  }
+
+  .btn-book-delete {
+    opacity: 1;
+    width: 36px;
+    height: 36px;
+  }
 }
 
 @media (max-width: 768px) {
@@ -1931,7 +1976,7 @@ p code, li code, td code {
   }
 
   .books-container {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1.25rem 0.85rem;
   }
 
@@ -1974,18 +2019,12 @@ p code, li code, td code {
   }
 
   .books-container {
-    grid-template-columns: repeat(2, 1fr); /* Exactamente de 2 en 2 en móvil */
+    grid-template-columns: 1fr;
     gap: 1rem 0.65rem;
-  }
-
-  .book-cover-title-emboss {
-    font-size: 0.8rem;
-    padding: 0.2rem;
   }
 
   .book-title-label {
     font-size: 0.78rem;
-    margin-top: 0.45rem;
   }
 
   .category-tile {

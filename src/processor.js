@@ -4,14 +4,227 @@ const crypto = require('crypto');
 const AdmZip = require('adm-zip');
 const { slugify, findBookByCode, createBookTransaction, replaceBookTransaction } = require('./db');
 
-
-const BASE_LIBRARY_PATH = process.env.LIBRARY_PATH || (process.env.VERCEL ? path.join('/tmp', 'library') : path.join(__dirname, '..', 'library'));
+const BASE_LIBRARY_PATH = process.env.LIBRARY_PATH ||
+  (process.env.VERCEL ? path.join('/tmp', 'library') : path.join(__dirname, '..', 'library'));
 
 function ensureDir(dirPath) {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
+  fs.mkdirSync(dirPath, { recursive: true });
+}
+
+// ─── Security limits ───────────────────────────────────────────────────────────
+const MAX_ZIP_SIZE_BYTES        = 100 * 1024 * 1024;  // 100 MB — max compressed ZIP size
+const MAX_FILE_SIZE_BYTES       =  50 * 1024 * 1024;  //  50 MB — max single uncompressed entry
+const MAX_TOTAL_UNCOMPRESSED    = 500 * 1024 * 1024;  // 500 MB — total uncompressed budget
+const MAX_COMPRESSION_RATIO     = 50;                  // ZIP bomb: reject if ratio > 50×
+const MAX_ENTRY_COUNT           = 500;                 // max files in a single ZIP
+
+// Extensions allowed for asset files (images/binary)
+const ALLOWED_ASSET_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']);
+
+// Extensions that must never be extracted regardless of context
+const BLOCKED_EXTS = new Set([
+  '.html', '.htm', '.js', '.mjs', '.cjs', '.ts', '.jsx', '.tsx',
+  '.php', '.rb', '.py', '.pl', '.sh', '.bash', '.zsh', '.fish',
+  '.exe', '.bat', '.cmd', '.ps1', '.vbs', '.wsf', '.hta',
+  '.jar', '.war', '.ear', '.class',
+  '.dll', '.so', '.dylib',
+]);
+
+// Windows reserved device names — cannot be created as files on Windows
+const WIN_RESERVED = new Set([
+  'CON','PRN','AUX','NUL',
+  'COM1','COM2','COM3','COM4','COM5','COM6','COM7','COM8','COM9',
+  'LPT1','LPT2','LPT3','LPT4','LPT5','LPT6','LPT7','LPT8','LPT9',
+]);
+
+/**
+ * Validates an entry name and returns its resolved absolute path.
+ * Throws a security error if the entry attempts to escape targetDir
+ * (Zip Slip / path traversal protection).
+ * @param {string} entryName  — raw entry name from the ZIP
+ * @param {string} targetDir  — absolute extraction root (must end without sep)
+ * @returns {string} safe resolved absolute path
+ */
+function safeResolvePath(entryName, targetDir) {
+  // Reject null bytes
+  if (entryName.includes('\0')) {
+    throw Object.assign(new Error(`Null byte in entry name: "${entryName}"`), { isSecurityError: true });
+  }
+
+  if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(entryName)) {
+    throw Object.assign(new Error(`Path traversal attempt blocked: "${entryName}"`), { isSecurityError: true });
+  }
+
+  // Reject absolute paths (both Unix and Windows)
+  if (path.isAbsolute(entryName) || /^[a-zA-Z]:/.test(entryName)) {
+    throw Object.assign(new Error(`Absolute path in ZIP entry: "${entryName}"`), { isSecurityError: true });
+  }
+
+  // Check Windows reserved names in any path component
+  for (const part of entryName.split(/[\\/]/)) {
+    const upper = path.basename(part, path.extname(part)).toUpperCase();
+    if (WIN_RESERVED.has(upper)) {
+      throw Object.assign(new Error(`Reserved filename in ZIP: "${part}"`), { isSecurityError: true });
+    }
+    if (part.length > 255) {
+      throw Object.assign(new Error(`Filename too long in ZIP: "${part}"`), { isSecurityError: true });
+    }
+  }
+
+  // Resolve and verify containment (Zip Slip)
+  const resolved = path.resolve(targetDir, entryName);
+  const root = targetDir.endsWith(path.sep) ? targetDir : targetDir + path.sep;
+  if (!resolved.startsWith(root) && resolved !== targetDir) {
+    throw Object.assign(
+      new Error(`Path traversal attempt blocked: "${entryName}" → "${resolved}"`),
+      { isSecurityError: true }
+    );
+  }
+
+  return resolved;
+}
+
+/**
+ * Performs a comprehensive security pre-scan of a ZIP before any extraction.
+ * Checks: file count, entry sizes, compression ratio, ZIP bomb, blocked
+ * extensions, and path traversal in all entry names.
+ * @param {string} zipFilePath  — path to the ZIP/MDZ on disk
+ * @param {AdmZip} zip
+ * @param {ZipEntry[]} entries
+ */
+function securityScanZip(zipFilePath, zip, entries) {
+  // 1. Compressed file size limit
+  const zipSize = fs.statSync(zipFilePath).size;
+  if (zipSize > MAX_ZIP_SIZE_BYTES) {
+    const mb = (zipSize / 1024 / 1024).toFixed(1);
+    throw Object.assign(
+      new Error(`El archivo comprimido es demasiado grande: ${mb} MB (máximo ${MAX_ZIP_SIZE_BYTES / 1024 / 1024} MB).`),
+      { isSecurityError: true }
+    );
+  }
+
+  // 2. Entry count limit (prevents "too many files" DoS)
+  if (entries.length > MAX_ENTRY_COUNT) {
+    throw Object.assign(
+      new Error(`El ZIP contiene demasiados archivos: ${entries.length} (máximo ${MAX_ENTRY_COUNT}).`),
+      { isSecurityError: true }
+    );
+  }
+
+  let totalUncompressed = 0;
+
+  for (const entry of entries) {
+    const name = typeof entry.entryName === 'string' ? entry.entryName : '';
+    const header = entry.header || {};
+    const compressedSize = header.compressedSize;
+    const uncompressedSize = header.size;
+    if (!name || !Number.isSafeInteger(compressedSize) || compressedSize < 0 ||
+        !Number.isSafeInteger(uncompressedSize) || uncompressedSize < 0) {
+      throw Object.assign(new Error(`Cabecera ZIP inválida para la entrada "${name}".`), { isSecurityError: true });
+    }
+
+    safeResolvePath(name, path.resolve(BASE_LIBRARY_PATH, '.scan'));
+
+    // 3. Single-file size limit
+    if (!entry.isDirectory && uncompressedSize > MAX_FILE_SIZE_BYTES) {
+      const mb = (uncompressedSize / 1024 / 1024).toFixed(1);
+      throw Object.assign(
+        new Error(`Archivo demasiado grande en el ZIP: "${name}" (${mb} MB, máximo ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB).`),
+        { isSecurityError: true }
+      );
+    }
+
+    // 4. ZIP bomb: compression ratio check
+    if (!entry.isDirectory && compressedSize > 0 && (uncompressedSize / compressedSize) > MAX_COMPRESSION_RATIO) {
+      const ratio = (uncompressedSize / compressedSize).toFixed(0);
+      throw Object.assign(
+        new Error(`Posible ZIP bomb detectado: "${name}" tiene una ratio de compresión de ${ratio}× (máximo ${MAX_COMPRESSION_RATIO}×).`),
+        { isSecurityError: true }
+      );
+    }
+
+    // 5. Total uncompressed budget (ZIP bomb across multiple files)
+    totalUncompressed += entry.isDirectory ? 0 : uncompressedSize;
+    if (totalUncompressed > MAX_TOTAL_UNCOMPRESSED) {
+      const mb = (totalUncompressed / 1024 / 1024).toFixed(0);
+      throw Object.assign(
+        new Error(`El contenido total descomprimido supera el límite: ${mb} MB (máximo ${MAX_TOTAL_UNCOMPRESSED / 1024 / 1024} MB).`),
+        { isSecurityError: true }
+      );
+    }
+
+    // 6. Symlink detection via Unix file attributes (attr >> 16 gives Unix mode)
+    const unixAttrs = ((Number.isInteger(header.attr) ? header.attr : 0) >> 16) & 0xFFFF;
+    const isSymlink = (unixAttrs & 0xF000) === 0xA000;
+    if (isSymlink) {
+      throw Object.assign(
+        new Error(`Symlink detectado en el ZIP: "${name}". Los symlinks no están permitidos.`),
+        { isSecurityError: true }
+      );
+    }
+
+    // 7. Blocked file extension check
+    const ext = path.extname(name).toLowerCase();
+    if (!entry.isDirectory && BLOCKED_EXTS.has(ext)) {
+      throw Object.assign(
+        new Error(`Extensión de archivo no permitida en el ZIP: "${name}" (extensión bloqueada: ${ext}).`),
+        { isSecurityError: true }
+      );
+    }
+    if (!entry.isDirectory && ext === '.svg') {
+      throw Object.assign(new Error(`SVG no permitido en el ZIP: "${name}".`), { isSecurityError: true });
+    }
+
+    // 8. Null bytes and path traversal in entry name
+    if (name.includes('\0')) {
+      throw Object.assign(
+        new Error(`Null byte en nombre de archivo ZIP: "${name}"`),
+        { isSecurityError: true }
+      );
+    }
+    if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(name)) {
+      throw Object.assign(
+        new Error(`Path traversal detectado en entrada ZIP: "${name}"`),
+        { isSecurityError: true }
+      );
+    }
   }
 }
+
+function validateAssetMagic(entry, data) {
+  const ext = path.extname(entry.entryName).toLowerCase();
+  if (!ALLOWED_ASSET_EXTS.has(ext) || ext === '.svg') return;
+  if (!Buffer.isBuffer(data)) {
+    throw Object.assign(new Error(`No se pudo leer el asset "${entry.entryName}".`), { isSecurityError: true });
+  }
+  const startsWith = (bytes, offset = 0) => bytes.every((value, index) => data[offset + index] === value);
+  const valid = ext === '.png'
+    ? startsWith([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    : ext === '.jpg' || ext === '.jpeg' ? startsWith([0xff, 0xd8, 0xff])
+    : ext === '.gif' ? (data.length >= 6 && ['GIF87a', 'GIF89a'].includes(data.subarray(0, 6).toString('ascii')))
+    : data.length >= 12 && startsWith([0x52, 0x49, 0x46, 0x46]) && data.subarray(8, 12).toString('ascii') === 'WEBP';
+  if (!valid) {
+    throw Object.assign(new Error(`Posible MIME spoofing: "${entry.entryName}" no coincide con su extensión.`), { isSecurityError: true });
+  }
+}
+
+function validateZipFileSignature(zipFilePath) {
+  const fd = fs.openSync(zipFilePath, 'r');
+  try {
+    const signature = Buffer.alloc(4);
+    const read = fs.readSync(fd, signature, 0, 4, 0);
+    const valid = read === 4 && (
+      signature.equals(Buffer.from([0x50, 0x4b, 0x03, 0x04])) ||
+      signature.equals(Buffer.from([0x50, 0x4b, 0x05, 0x06])) ||
+      signature.equals(Buffer.from([0x50, 0x4b, 0x07, 0x08]))
+    );
+    if (!valid) throw Object.assign(new Error('El archivo no es un ZIP/MDZ válido.'), { isSecurityError: true });
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+
 
 function naturalSort(a, b) {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
@@ -142,8 +355,10 @@ function validateZipContents(zip, metadata, mdEntries, chaptersFolderEntries) {
  */
 async function processZipFile(zipFilePath, originalName = 'Libro') {
 
+  validateZipFileSignature(zipFilePath);
   const zip = new AdmZip(zipFilePath);
   const zipEntries = zip.getEntries();
+  securityScanZip(zipFilePath, zip, zipEntries);
 
   if (!zipEntries || zipEntries.length === 0) {
     throw new Error('El archivo comprimido (.zip o .mdz) está vacío o dañado.');
@@ -200,6 +415,17 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
   // 2. Localizar archivos Markdown e imágenes
   const mdEntries = zipEntries.filter(e => !e.isDirectory && /\.md$/i.test(e.entryName));
   const assetEntries = zipEntries.filter(e => !e.isDirectory && /\.(png|jpe?g|gif|webp|svg)$/i.test(e.entryName));
+
+  const assetNames = new Set();
+  for (const asset of assetEntries) {
+    const safeName = path.basename(asset.entryName);
+    const key = safeName.toLowerCase();
+    if (assetNames.has(key)) {
+      throw Object.assign(new Error(`Colisión de nombres de assets en el ZIP: "${safeName}".`), { isSecurityError: true });
+    }
+    assetNames.add(key);
+    validateAssetMagic(asset, zip.readFile(asset));
+  }
 
   if (mdEntries.length === 0) {
     throw new Error('El archivo no contiene ningún archivo Markdown (.md).');
@@ -355,8 +581,8 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
   const sectionSlug = slugify(metadata.section);
   const subsectionSlug = slugify(metadata.subsection);
   const bookFolderSlug = slugify(metadata.title) + '-' + Date.now().toString(36);
-  const stagingDir = path.join(BASE_LIBRARY_PATH, sectionSlug, subsectionSlug, bookFolderSlug + '-staging');
-  const finalDir   = path.join(BASE_LIBRARY_PATH, sectionSlug, subsectionSlug, bookFolderSlug);
+  const stagingDir = safeResolvePath(path.join(sectionSlug, subsectionSlug, bookFolderSlug + '-staging'), BASE_LIBRARY_PATH);
+  const finalDir   = safeResolvePath(path.join(sectionSlug, subsectionSlug, bookFolderSlug), BASE_LIBRARY_PATH);
 
   ensureDir(stagingDir);
 
@@ -367,7 +593,7 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
     // 7a. Escribir capítulos en staging
     for (const ch of chapters) {
       const targetFileName = `${String(ch.order_index).padStart(2, '0')}_${ch.file_name}`;
-      const targetFilePath = path.join(stagingDir, targetFileName);
+      const targetFilePath = safeResolvePath(targetFileName, stagingDir);
       fs.writeFileSync(targetFilePath, ch.entry.getData());
       chaptersData.push({
         title: ch.title,
@@ -380,11 +606,12 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
 
     // 7b. Extraer assets en staging
     if (assetEntries.length > 0) {
-      const assetsDir = path.join(stagingDir, 'assets');
+      const assetsDir = safeResolvePath('assets', stagingDir);
       ensureDir(assetsDir);
       for (const asset of assetEntries) {
         const safeName = path.basename(asset.entryName);
-        fs.writeFileSync(path.join(assetsDir, safeName), asset.getData());
+        const assetPath = safeResolvePath(safeName, assetsDir);
+        fs.writeFileSync(assetPath, asset.getData());
         const coverBasename = metadata.cover ? path.basename(metadata.cover).toLowerCase() : null;
         if (!coverImagePath && (
           (coverBasename && safeName.toLowerCase() === coverBasename) ||
@@ -418,7 +645,7 @@ async function processZipFile(zipFilePath, originalName = 'Libro') {
       }))
     };
     fs.writeFileSync(
-      path.join(stagingDir, 'metadata.json'),
+      safeResolvePath('metadata.json', stagingDir),
       JSON.stringify(completeMetadata, null, 2),
       'utf8'
     );
@@ -501,5 +728,8 @@ module.exports = {
   countWords,
   parseDateSafely,
   validateZipContents,
-  sha256File
+  sha256File,
+  safeResolvePath,
+  securityScanZip,
+  validateAssetMagic
 };

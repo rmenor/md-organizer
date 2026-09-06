@@ -50,6 +50,38 @@ const Reader = (() => {
     });
   }
 
+  function safeMarkdownFragment(markdown, bookId) {
+    const parsed = new DOMParser().parseFromString(marked.parse(String(markdown || '')), 'text/html');
+    const allowed = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'UL', 'OL', 'LI', 'A', 'IMG', 'PRE', 'CODE', 'BLOCKQUOTE', 'EM', 'STRONG', 'DEL', 'BR', 'HR']);
+    const fragment = document.createDocumentFragment();
+    const safeUrl = (value, image = false) => {
+      if (image && /^(?:\.\/)?assets\//i.test(value)) {
+        const assetName = value.split('/').pop();
+        if (!assetName || /[\\\0]/.test(assetName)) return '';
+        return `/api/books/${encodeURIComponent(bookId)}/assets/${encodeURIComponent(assetName)}`;
+      }
+      try {
+        const url = new URL(value, window.location.origin);
+        if (url.protocol === 'http:' || url.protocol === 'https:') return url.href;
+        if (url.origin === window.location.origin && (value.startsWith('/') || value.startsWith('./'))) return url.pathname + url.search + url.hash;
+      } catch (_) {}
+      return image ? '' : '#';
+    };
+    const copy = (node, parent) => {
+      if (node.nodeType === Node.TEXT_NODE) { parent.appendChild(document.createTextNode(node.nodeValue)); return; }
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      if (!allowed.has(node.tagName)) { [...node.childNodes].forEach(child => copy(child, parent)); return; }
+      const out = document.createElement(node.tagName.toLowerCase());
+      if (node.tagName === 'A') { const href = safeUrl(node.getAttribute('href') || ''); if (href !== '#') out.href = href; }
+      if (node.tagName === 'IMG') { const src = safeUrl(node.getAttribute('src') || '', true); if (!src) return; out.src = src; out.alt = node.getAttribute('alt') || ''; }
+      if (node.tagName === 'CODE' && node.className) out.className = node.className.replace(/[^a-zA-Z0-9 _-]/g, '');
+      [...node.childNodes].forEach(child => copy(child, out));
+      parent.appendChild(out);
+    };
+    [...parsed.body.childNodes].forEach(node => copy(node, fragment));
+    return fragment;
+  }
+
   function init() {
     btnCloseReader.addEventListener('click', closeReader);
 
@@ -282,8 +314,9 @@ const Reader = (() => {
       li.className = `chapter-item ${idx === currentChapterIndex ? 'active' : ''}`;
       li.innerHTML = `
         <span class="chapter-number">${idx + 1}.</span>
-        <span class="chapter-item-title">${ch.title}</span>
+        <span class="chapter-item-title"></span>
       `;
+      li.querySelector('.chapter-item-title').textContent = ch.title || '';
       li.addEventListener('click', () => {
         goToChapter(idx);
         closeToc(); // Cerrar drawer de capítulos en móvil automáticamente
@@ -324,15 +357,7 @@ const Reader = (() => {
       if (!res.ok) throw new Error('Error al cargar el contenido del capítulo');
       const data = await res.json();
 
-      let renderedHtml = marked.parse(data.content);
-
-      // Si el markdown contiene imágenes con rutas relativas como 'assets/foto.png', convertirlas a la ruta API
-      renderedHtml = renderedHtml.replace(/src=["'](\.\/)?(assets\/[^"']+)["']/g, (match, prefix, assetPath) => {
-        const assetName = assetPath.split('/').pop();
-        return `src="/api/books/${currentBook.id}/assets/${assetName}"`;
-      });
-
-      readerContentEl.innerHTML = renderedHtml;
+      readerContentEl.replaceChildren(safeMarkdownFragment(data.content, currentBook.id));
 
       // Resaltar sintaxis de código
       if (window.hljs) {

@@ -25,7 +25,7 @@ const {
   searchLibrary,
   deleteBook
 } = require('../src/db');
-const { processZipFile } = require('../src/processor');
+const { processZipFile, safeResolvePath, securityScanZip } = require('../src/processor');
 const AdmZip = require('adm-zip');
 
 test('Capa de Base de Datos (SQLite3)', async (t) => {
@@ -227,7 +227,7 @@ test('Procesador de Archivos ZIP y Control de Versiones', async (t) => {
     zip.addFile('chapters/02_manifest.md', Buffer.from('# Estructura del Manifiesto\nContenido del capítulo 2.', 'utf8'));
 
     // 4. assets
-    zip.addFile('assets/cover.webp', Buffer.from('fake-cover-content', 'utf8'));
+    zip.addFile('assets/cover.webp', Buffer.from('RIFF\x00\x00\x00\x00WEBP', 'ascii'));
 
     zip.writeZip(testMdzPath);
 
@@ -251,6 +251,72 @@ test('Procesador de Archivos ZIP y Control de Versiones', async (t) => {
     // Limpiar archivo .mdz de prueba
     if (fs.existsSync(testMdzPath)) fs.unlinkSync(testMdzPath);
   });
+});
+
+test('Hardening de seguridad del importador ZIP/MDZ', async (t) => {
+  const tempFiles = [];
+  const makeZip = (name, entryName, content = '# capítulo') => {
+    const filePath = path.join(__dirname, name);
+    const zip = new AdmZip();
+    zip.addFile(entryName, Buffer.from(content, 'utf8'));
+    zip.writeZip(filePath);
+    tempFiles.push(filePath);
+    return filePath;
+  };
+  const rejectsSecurity = async (filePath) => assert.rejects(
+    () => processZipFile(filePath, path.basename(filePath)),
+    err => err && err.isSecurityError === true
+  );
+
+  await t.test('bloquea traversal Unix, Windows, rutas absolutas y nombres reservados', async () => {
+    assert.throws(() => safeResolvePath('../outside.md', TEST_LIB_PATH), /traversal/i);
+    assert.throws(() => safeResolvePath('..\\outside.md', TEST_LIB_PATH), /traversal/i);
+    assert.throws(() => safeResolvePath('/tmp/outside.md', TEST_LIB_PATH), /Absolute path/i);
+    assert.throws(() => safeResolvePath('C:\\temp\\outside.md', TEST_LIB_PATH), /Absolute path/i);
+    assert.throws(() => safeResolvePath('CON.txt', TEST_LIB_PATH), /Reserved filename/i);
+    assert.throws(() => safeResolvePath('safe\0.md', TEST_LIB_PATH), /Null byte/i);
+  });
+
+  await t.test('rechaza extensiones ejecutables, SVG y raster con MIME falsificado', async () => {
+    await rejectsSecurity(makeZip('blocked-test.zip', 'payload.js'));
+    await rejectsSecurity(makeZip('svg-test.zip', 'image.svg', '<svg><script>alert(1)</script></svg>'));
+    await rejectsSecurity(makeZip('spoof-test.zip', 'image.png', 'not a PNG'));
+  });
+
+  await t.test('aplica ratio, tamaño inválido, symlink y límites sin descomprimir', () => {
+    const scanPath = path.join(__dirname, 'scan-limit.zip');
+    fs.writeFileSync(scanPath, Buffer.from('PK\x03\x04'));
+    tempFiles.push(scanPath);
+    const entry = (header, extra = {}) => ({
+      entryName: 'chapter.md', isDirectory: false, header, ...extra,
+      getData() { throw new Error('scanner must not read entry data'); }
+    });
+    assert.throws(() => securityScanZip(scanPath, null, [entry({ compressedSize: 1, size: 51 * 1024 * 1024, attr: 0 })]), /demasiado grande/i);
+    assert.throws(() => securityScanZip(scanPath, null, [entry({ compressedSize: 1, size: 100, attr: 0 })]), /ratio/i);
+    assert.throws(() => securityScanZip(scanPath, null, [entry({ compressedSize: 1, size: 1, attr: 0xA0000000 })]), /Symlink/i);
+    assert.throws(() => securityScanZip(scanPath, null, [entry({ compressedSize: undefined, size: 1, attr: 0 })]), /Cabecera ZIP inválida/i);
+  });
+
+  await t.test('rechaza un archivo que solo finge ser ZIP por extensión', async () => {
+    const fakePath = path.join(__dirname, 'fake-upload.zip');
+    fs.writeFileSync(fakePath, 'contenido no comprimido');
+    tempFiles.push(fakePath);
+    await rejectsSecurity(fakePath);
+  });
+
+  await t.test('mantiene el renderizado importado fuera de sinks HTML inseguros', () => {
+    const appSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'app.js'), 'utf8');
+    const readerSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'reader.js'), 'utf8');
+    assert.doesNotMatch(appSource, /innerHTML\s*=\s*marked\.parse/);
+    assert.doesNotMatch(readerSource, /innerHTML\s*=\s*marked\.parse/);
+    assert.match(appSource, /safeMarkdownFragment/);
+    assert.match(readerSource, /safeMarkdownFragment/);
+    assert.match(readerSource, /chapter-item-title.*textContent|textContent.*chapter-item-title/s);
+    assert.match(appSource, /book-card-info[\s\S]*book-title-label/);
+    assert.match(appSource, /book-title-label[^`]*escapeHtml\(book\.title\)/);
+  });
+
+  t.after(() => tempFiles.forEach(filePath => { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); }));
 });
 
 test.after(() => {
