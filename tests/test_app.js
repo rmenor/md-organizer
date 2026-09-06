@@ -26,6 +26,12 @@ const {
   deleteBook
 } = require('../src/db');
 const { processZipFile, safeResolvePath, securityScanZip } = require('../src/processor');
+const {
+  createBackupArchive,
+  inspectBackupArchive,
+  restoreBackupArchive,
+  BACKUP_FORMAT
+} = require('../src/backup');
 const AdmZip = require('adm-zip');
 
 test('Las portadas usan una proporción cuadrada', () => {
@@ -349,7 +355,95 @@ test('Hardening de seguridad del importador ZIP/MDZ', async (t) => {
   t.after(() => tempFiles.forEach(filePath => { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); }));
 });
 
+test('Sistema de Copias de Seguridad y Restauración (Backup & Restore)', async (t) => {
+  const tempBackupFiles = [];
+
+  await t.test('1. Exporta copia de seguridad completa (.zip) con manifest, database.sqlite y library/', async () => {
+    const backupFile = path.join(__dirname, 'test_export_backup.zip');
+    tempBackupFiles.push(backupFile);
+
+    const result = await createBackupArchive(backupFile);
+    assert.ok(fs.existsSync(backupFile));
+    assert.equal(result.manifest.format, BACKUP_FORMAT);
+    assert.ok(result.manifest.stats.booksCount >= 1);
+    assert.ok(result.manifest.database_checksum.startsWith('sha256:'));
+
+    // Verificar contenido del ZIP
+    const zip = new AdmZip(backupFile);
+    const entryNames = zip.getEntries().map(e => e.entryName);
+    assert.ok(entryNames.includes('backup-manifest.json'));
+    assert.ok(entryNames.includes('database.sqlite'));
+  });
+
+  await t.test('2. Inspecciona copia de seguridad (pre-flight) sin modificar la biblioteca', async () => {
+    const backupFile = path.join(__dirname, 'test_inspect_backup.zip');
+    tempBackupFiles.push(backupFile);
+    await createBackupArchive(backupFile);
+
+    const inspection = inspectBackupArchive(backupFile);
+    assert.equal(inspection.valid, true);
+    assert.equal(inspection.manifest.format, BACKUP_FORMAT);
+    assert.ok(inspection.stats.booksCount >= 1);
+    assert.ok(inspection.created_at);
+  });
+
+  await t.test('3. Restaura una copia de seguridad recuperando libros, capítulos y ajustando storage_path', async () => {
+    const backupFile = path.join(__dirname, 'test_restore_backup.zip');
+    tempBackupFiles.push(backupFile);
+    await createBackupArchive(backupFile);
+
+    // Guardar estado inicial
+    const initialTree = getLibraryTree();
+    assert.ok(initialTree.length > 0);
+
+    const firstBook = initialTree[0].subsections[0].books[0];
+    const originalCode = firstBook.code;
+
+    // Eliminar un libro
+    deleteBook(firstBook.id);
+    assert.ok(!findBookByCode(originalCode));
+
+    // Restaurar desde el backup
+    const restoreResult = await restoreBackupArchive(backupFile);
+    assert.equal(restoreResult.success, true);
+
+    // Verificar que el libro eliminado fue recuperado al 100%
+    const restoredBook = findBookByCode(originalCode);
+    assert.ok(restoredBook, 'El libro restaurado debe existir en la base de datos');
+    assert.equal(restoredBook.title, firstBook.title);
+    assert.ok(fs.existsSync(restoredBook.storage_path), 'La carpeta del libro debe existir en disco');
+  });
+
+  await t.test('4. Ejecuta rollback automático si el backup está corrupto sin perder datos', async () => {
+    const corruptFile = path.join(__dirname, 'test_corrupt_backup.zip');
+    tempBackupFiles.push(corruptFile);
+
+    // Crear zip con manifest pero db dañada
+    const zip = new AdmZip();
+    zip.addFile('backup-manifest.json', Buffer.from(JSON.stringify({ format: BACKUP_FORMAT, version: '1.0' })));
+    zip.addFile('database.sqlite', Buffer.from('NOT A VALID SQLITE DATABASE HEADER'));
+    zip.writeZip(corruptFile);
+
+    const treeBefore = getLibraryTree();
+    await assert.rejects(
+      () => restoreBackupArchive(corruptFile),
+      /cabecera SQLite válida|corrupto|dañada/i
+    );
+
+    // Comprobar que la biblioteca sigue intacta
+    const treeAfter = getLibraryTree();
+    assert.equal(treeAfter.length, treeBefore.length);
+  });
+
+  t.after(() => {
+    tempBackupFiles.forEach(f => {
+      if (fs.existsSync(f)) fs.unlinkSync(f);
+    });
+  });
+});
+
 test.after(() => {
   if (fs.existsSync(TEST_DB_PATH)) fs.unlinkSync(TEST_DB_PATH);
   if (fs.existsSync(TEST_LIB_PATH)) fs.rmSync(TEST_LIB_PATH, { recursive: true, force: true });
 });
+

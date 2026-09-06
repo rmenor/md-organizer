@@ -79,6 +79,35 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnConfirmDelete = document.getElementById('btn-confirm-delete');
   let bookToDelete = null;
 
+  // Modal Backup y Restore
+  const btnBackupToggle = document.getElementById('btn-backup-toggle');
+  const backupModal = document.getElementById('backup-modal');
+  const btnCloseBackupModal = document.getElementById('btn-close-backup-modal');
+  const btnCancelBackupModal = document.getElementById('btn-cancel-backup-modal');
+  const backupTabBtns = document.querySelectorAll('.backup-tab-btn');
+  const backupPanes = document.querySelectorAll('.backup-pane');
+  const backupStatBooks = document.getElementById('backup-stat-books');
+  const backupStatChapters = document.getElementById('backup-stat-chapters');
+  const backupStatSections = document.getElementById('backup-stat-sections');
+  const backupDropZone = document.getElementById('backup-drop-zone');
+  const backupFileInput = document.getElementById('backup-file-input');
+  const backupFileChosenInfo = document.getElementById('backup-file-chosen-info');
+  const backupChosenFileName = document.getElementById('backup-chosen-file-name');
+  const backupChosenFileSize = document.getElementById('backup-chosen-file-size');
+  const backupInspectionCard = document.getElementById('backup-inspection-card');
+  const inspectBackupDate = document.getElementById('inspect-backup-date');
+  const inspectAppVer = document.getElementById('inspect-app-ver');
+  const inspectBooksCount = document.getElementById('inspect-books-count');
+  const inspectChaptersCount = document.getElementById('inspect-chapters-count');
+  const inspectFilesCount = document.getElementById('inspect-files-count');
+  const backupRestoreProgress = document.getElementById('backup-restore-progress');
+  const backupProgressBarFill = document.getElementById('backup-progress-bar-fill');
+  const backupProgressText = document.getElementById('backup-progress-text');
+  const backupModalAlert = document.getElementById('backup-modal-alert');
+  const btnConfirmRestore = document.getElementById('btn-confirm-restore');
+  let selectedBackupFile = null;
+
+
   // Utilidad para sanitizar texto HTML
   function escapeHtml(str) {
     if (!str) return '';
@@ -858,6 +887,225 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // ==========================================
+  // MODAL COPIAS DE SEGURIDAD (BACKUP & RESTORE)
+  // ==========================================
+  function showBackupAlert(msg, type = 'error') {
+    if (!backupModalAlert) return;
+    backupModalAlert.textContent = msg;
+    backupModalAlert.className = `alert-message ${type}`;
+    backupModalAlert.classList.remove('hidden');
+  }
+
+  function hideBackupAlert() {
+    if (backupModalAlert) backupModalAlert.classList.add('hidden');
+  }
+
+  function openBackupModal(activeTab = 'export') {
+    hideBackupAlert();
+    selectedBackupFile = null;
+    if (backupFileInput) backupFileInput.value = '';
+    if (backupFileChosenInfo) backupFileChosenInfo.classList.add('hidden');
+    if (backupInspectionCard) backupInspectionCard.classList.add('hidden');
+    if (backupRestoreProgress) backupRestoreProgress.classList.add('hidden');
+    if (btnConfirmRestore) {
+      btnConfirmRestore.disabled = true;
+      btnConfirmRestore.classList.add('hidden');
+      btnConfirmRestore.textContent = 'Confirmar y Restaurar';
+    }
+
+    // Calcular estadísticas actuales de la biblioteca
+    let booksCount = 0;
+    let chaptersCount = 0;
+    let sectionsCount = libraryData.length;
+
+    libraryData.forEach(sec => {
+      (sec.subsections || []).forEach(sub => {
+        (sub.books || []).forEach(b => {
+          booksCount++;
+          chaptersCount += (b.total_chapters || 0);
+        });
+      });
+    });
+
+    if (backupStatBooks) backupStatBooks.textContent = String(booksCount);
+    if (backupStatChapters) backupStatChapters.textContent = String(chaptersCount);
+    if (backupStatSections) backupStatSections.textContent = String(sectionsCount);
+
+    // Cambiar a la pestaña correspondiente
+    switchBackupTab(activeTab);
+
+    if (backupModal) backupModal.classList.remove('hidden');
+  }
+
+  function closeBackupModal() {
+    if (backupModal) backupModal.classList.add('hidden');
+  }
+
+  function switchBackupTab(tabName) {
+    hideBackupAlert();
+    backupTabBtns.forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-backup-tab') === tabName);
+    });
+    backupPanes.forEach(pane => {
+      pane.classList.toggle('hidden', pane.id !== `backup-pane-${tabName}`);
+    });
+  }
+
+  backupTabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.getAttribute('data-backup-tab');
+      switchBackupTab(target);
+    });
+  });
+
+  if (btnBackupToggle) {
+    btnBackupToggle.addEventListener('click', () => openBackupModal('export'));
+  }
+  if (btnCloseBackupModal) {
+    btnCloseBackupModal.addEventListener('click', closeBackupModal);
+  }
+  if (btnCancelBackupModal) {
+    btnCancelBackupModal.addEventListener('click', closeBackupModal);
+  }
+  if (backupModal) {
+    backupModal.addEventListener('click', (e) => {
+      if (e.target === backupModal) closeBackupModal();
+    });
+  }
+
+  // Zona de arrastre y selección de archivo para restaurar
+  if (backupDropZone && backupFileInput) {
+    backupDropZone.addEventListener('click', () => backupFileInput.click());
+
+    backupDropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      backupDropZone.classList.add('dragover');
+    });
+
+    backupDropZone.addEventListener('dragleave', () => {
+      backupDropZone.classList.remove('dragover');
+    });
+
+    backupDropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      backupDropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) {
+        handleBackupFileChosen(e.dataTransfer.files[0]);
+      }
+    });
+
+    backupFileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        handleBackupFileChosen(e.target.files[0]);
+      }
+    });
+  }
+
+  async function handleBackupFileChosen(file) {
+    hideBackupAlert();
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+      showBackupAlert('Solo se permiten archivos de copia de seguridad en formato .zip', 'error');
+      return;
+    }
+
+    selectedBackupFile = file;
+    if (backupChosenFileName) backupChosenFileName.textContent = file.name;
+    if (backupChosenFileSize) backupChosenFileSize.textContent = `(${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+    if (backupFileChosenInfo) backupFileChosenInfo.classList.remove('hidden');
+
+    // Pre-flight inspection automática
+    if (backupRestoreProgress) {
+      backupRestoreProgress.classList.remove('hidden');
+      if (backupProgressBarFill) backupProgressBarFill.style.width = '40%';
+      if (backupProgressText) backupProgressText.textContent = 'Inspeccionando y verificando integridad del archivo...';
+    }
+
+    const formData = new FormData();
+    formData.append('backupFile', file);
+
+    try {
+      const res = await fetch('/api/backup/inspect', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (backupRestoreProgress) backupRestoreProgress.classList.add('hidden');
+
+      if (!res.ok) {
+        throw new Error(data.error || 'El archivo no es una copia de seguridad válida.');
+      }
+
+      // Mostrar tarjeta de inspección previa
+      if (inspectBackupDate) {
+        const d = new Date(data.created_at);
+        inspectBackupDate.textContent = isNaN(d.getTime()) ? data.created_at : d.toLocaleString('es-ES');
+      }
+      if (inspectAppVer) inspectAppVer.textContent = data.app_version || '1.0.0';
+      if (inspectBooksCount) inspectBooksCount.textContent = `${data.stats.booksCount || 0} libros`;
+      if (inspectChaptersCount) inspectChaptersCount.textContent = `${data.stats.chaptersCount || 0} capítulos`;
+      if (inspectFilesCount) inspectFilesCount.textContent = `${data.libraryFilesCount || 0} archivos`;
+
+      if (backupInspectionCard) backupInspectionCard.classList.remove('hidden');
+      if (btnConfirmRestore) {
+        btnConfirmRestore.classList.remove('hidden');
+        btnConfirmRestore.disabled = false;
+      }
+    } catch (err) {
+      if (backupRestoreProgress) backupRestoreProgress.classList.add('hidden');
+      if (backupInspectionCard) backupInspectionCard.classList.add('hidden');
+      if (btnConfirmRestore) btnConfirmRestore.classList.add('hidden');
+      showBackupAlert(`❌ Error de verificación: ${err.message}`, 'error');
+    }
+  }
+
+  if (btnConfirmRestore) {
+    btnConfirmRestore.addEventListener('click', async () => {
+      if (!selectedBackupFile) return;
+
+      btnConfirmRestore.disabled = true;
+      btnConfirmRestore.textContent = 'Restaurando...';
+      hideBackupAlert();
+
+      if (backupRestoreProgress) {
+        backupRestoreProgress.classList.remove('hidden');
+        if (backupProgressBarFill) backupProgressBarFill.style.width = '65%';
+        if (backupProgressText) backupProgressText.textContent = 'Restaurando base de datos, libros y re-mapeando rutas...';
+      }
+
+      const formData = new FormData();
+      formData.append('backupFile', selectedBackupFile);
+
+      try {
+        const res = await fetch('/api/backup/restore', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (backupProgressBarFill) backupProgressBarFill.style.width = '100%';
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Error al restaurar la copia de seguridad.');
+        }
+
+        showBackupAlert(`✓ ${data.message || 'Copia de seguridad restaurada con éxito.'}`, 'success');
+        await loadLibrary();
+
+        setTimeout(() => {
+          closeBackupModal();
+          showMainView('publications');
+        }, 1500);
+      } catch (err) {
+        if (backupRestoreProgress) backupRestoreProgress.classList.add('hidden');
+        btnConfirmRestore.disabled = false;
+        btnConfirmRestore.textContent = 'Confirmar y Restaurar';
+        showBackupAlert(err.message, 'error');
+      }
+    });
+  }
+
+
   function checkHash() {
     const h = window.location.hash;
     if (h === '#books') {
@@ -874,6 +1122,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Escape') {
       if (deleteModal && !deleteModal.classList.contains('hidden')) {
         closeDeleteModal();
+      } else if (backupModal && !backupModal.classList.contains('hidden')) {
+        closeBackupModal();
       } else if (uploadModal && !uploadModal.classList.contains('hidden')) {
         closeUploadModal();
       } else if (wikiView && !wikiView.classList.contains('hidden')) {

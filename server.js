@@ -11,6 +11,11 @@ const {
   searchLibrary
 } = require('./src/db');
 const { processZipFile } = require('./src/processor');
+const {
+  createBackupArchive,
+  inspectBackupArchive,
+  restoreBackupArchive
+} = require('./src/backup');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -241,6 +246,99 @@ app.post('/api/upload', (req, res, next) => {
 
   }
 });
+
+// ==========================================
+// ENDPOINTS DE COPIAS DE SEGURIDAD (BACKUP & RESTORE)
+// ==========================================
+
+// Endpoint: Exportar y descargar copia de seguridad completa (.zip)
+app.get('/api/backup/export', async (req, res) => {
+  try {
+    const backup = await createBackupArchive();
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${backup.filename}"`);
+    res.setHeader('Content-Length', backup.sizeBytes);
+    res.send(backup.buffer);
+
+    // Limpiar archivo temporal en disco si se guardó
+    if (backup.filePath && fs.existsSync(backup.filePath)) {
+      try { fs.unlinkSync(backup.filePath); } catch (_) {}
+    }
+  } catch (err) {
+    console.error('Error al generar copia de seguridad:', err);
+    res.status(500).json({ error: `Error al generar la copia de seguridad: ${err.message}` });
+  }
+});
+
+// Endpoint: Inspeccionar y validar archivo de copia de seguridad (pre-flight)
+app.post('/api/backup/inspect', (req, res, next) => {
+  uploadFields(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    const uploadedFile = (req.files && (
+      req.files['backupFile']?.[0] ||
+      req.files['backup']?.[0] ||
+      req.files['file']?.[0] ||
+      req.files['zipFile']?.[0]
+    )) || req.file;
+
+    req.file = uploadedFile;
+    next();
+  });
+}, (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No se ha adjuntado ningún archivo de copia de seguridad.' });
+  }
+
+  const uploadedFilePath = req.file.path;
+  try {
+    const inspection = inspectBackupArchive(uploadedFilePath);
+    if (fs.existsSync(uploadedFilePath)) {
+      try { fs.unlinkSync(uploadedFilePath); } catch (_) {}
+    }
+    res.json(inspection);
+  } catch (err) {
+    if (fs.existsSync(uploadedFilePath)) {
+      try { fs.unlinkSync(uploadedFilePath); } catch (_) {}
+    }
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Endpoint: Restaurar copia de seguridad con rollback automático
+app.post('/api/backup/restore', (req, res, next) => {
+  uploadFields(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    const uploadedFile = (req.files && (
+      req.files['backupFile']?.[0] ||
+      req.files['backup']?.[0] ||
+      req.files['file']?.[0] ||
+      req.files['zipFile']?.[0]
+    )) || req.file;
+
+    req.file = uploadedFile;
+    next();
+  });
+}, async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No se ha adjuntado ningún archivo de copia de seguridad para restaurar.' });
+  }
+
+  const uploadedFilePath = req.file.path;
+  try {
+    const result = await restoreBackupArchive(uploadedFilePath);
+    if (fs.existsSync(uploadedFilePath)) {
+      try { fs.unlinkSync(uploadedFilePath); } catch (_) {}
+    }
+    res.json(result);
+  } catch (err) {
+    if (fs.existsSync(uploadedFilePath)) {
+      try { fs.unlinkSync(uploadedFilePath); } catch (_) {}
+    }
+    console.error('Error al restaurar copia de seguridad:', err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
 
 // Endpoint: Eliminar libro
 app.delete('/api/books/:id', (req, res) => {

@@ -80,6 +80,14 @@ Before touching any file on disk or any database record, every upload goes throu
 
 If any check fails, the upload is **rejected with a clear error message** listing each problem — and the existing book in the library remains **100% untouched**. If a write error or database failure occurs mid-import, the staging directory is automatically cleaned up before the error is surfaced.
 
+### 💾 Complete Backup & Atomic Restore
+Export and restore your entire digital library with one click:
+- **Self-Contained Backup Archive (`.zip`)**: Bundles the consistent SQLite database snapshot (`database.sqlite`), editorial metadata, SHA-256 checksums, and all Markdown chapters and asset files under `library/`.
+- **Pre-Flight Inspection**: Inspects and validates backup integrity, app version, and publication count before applying changes.
+- **Atomic Restore with Automatic Rollback**: Restores all books and database tables in a staging transaction. If an error occurs, the system automatically rolls back to the previous snapshot without data loss.
+- **Cross-Platform Portability**: Restored book `storage_path` references are dynamically remapped to match the host platform's path layout (macOS, Linux, Windows, or Docker).
+
+
 ### 📖 Distraction-Free Web Reader
 - **Automatic Reading Resume (`localStorage`)**: Never lose your spot. MD Organizer automatically remembers the exact chapter and scroll position where you left off. Reopening any book instantly resumes right where you were, accompanied by in-library reading badges (`Cap. X`) and a subtle resume notification.
 - **3 Color Themes**: Dark Mode, Sepia (warm reading), and Light Mode.
@@ -236,6 +244,7 @@ PORT=8080 node server.js
 - **Sin compilaciones pesadas**: No necesitas regenerar el sitio web ni hacer commits para agregar libros como en Docusaurus o MkDocs.
 - **Control de Versiones inteligente**: Detecta el código del libro (`code`), compara números de versión y fechas de publicación, actualizando automáticamente las nuevas ediciones o advirtiendo para evitar pérdidas.
 - **Importación segura — el libro existente nunca se destruye**: Antes de escribir nada en disco ni en la base de datos, cada subida pasa por una validación completa en memoria. Solo si todos los checks son correctos (archivo no vacío, capítulos Markdown presentes, capítulos del manifest accesibles, sin capítulos vacíos, título y versión válidos) el sistema escribe los archivos en un directorio de staging y después ejecuta la transacción de base de datos. Si algo falla en cualquier punto, el staging se elimina automáticamente y el libro anterior queda **intacto**. Los errores se muestran como lista detallada en el modal de subida.
+- **Copias de Seguridad y Restauración Atómica (Backup & Restore)**: Exporta en un solo clic un archivo `.zip` completo con la instantánea SQLite, metadatos y todos los archivos Markdown de la biblioteca. La restauración cuenta con inspección previa (pre-flight), re-mapeo automático de rutas y rollback automático ante cualquier fallo.
 - **Lector web libre de distracciones**:
   - **Reanudación automática de lectura (`localStorage`)**: Guarda automáticamente tu capítulo y posición de desplazamiento exacta para continuar donde lo dejaste nada más abrir el libro, indicando el capítulo en curso en la biblioteca.
   - Modos **Oscuro**, **Sepia** y **Claro**.

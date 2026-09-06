@@ -10,11 +10,26 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const db = new Database(DB_PATH);
+let db = new Database(DB_PATH);
 
 // Configuración de rendimiento y restricciones
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+
+let insertBookStmt;
+let insertChapterStmt;
+
+function prepareStatements() {
+  insertBookStmt = db.prepare(`
+    INSERT INTO books (subsection_id, code, title, slug, version, publication_date, author, description, cover_image, storage_path, total_chapters)
+    VALUES (@subsection_id, @code, @title, @slug, @version, @publication_date, @author, @description, @cover_image, @storage_path, @total_chapters)
+  `);
+
+  insertChapterStmt = db.prepare(`
+    INSERT INTO chapters (book_id, title, order_index, file_name, relative_path, word_count)
+    VALUES (@book_id, @title, @order_index, @file_name, @relative_path, @word_count)
+  `);
+}
 
 // Inicialización de esquemas
 function initDb() {
@@ -84,6 +99,58 @@ function initDb() {
 }
 
 initDb();
+prepareStatements();
+
+function closeDatabase() {
+  if (db && db.open) {
+    try {
+      db.close();
+    } catch (_) {}
+  }
+}
+
+function reopenDatabase(customPath = null) {
+  closeDatabase();
+  const targetPath = customPath || DB_PATH;
+  db = new Database(targetPath);
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+  initDb();
+  prepareStatements();
+  module.exports.db = db;
+  return db;
+}
+
+async function backupDatabase(destPath) {
+  return db.backup(destPath);
+}
+
+function remapStoragePaths(baseLibraryPath) {
+  const books = db.prepare(`
+    SELECT b.id, b.storage_path, s.slug as section_slug, sub.slug as subsection_slug
+    FROM books b
+    JOIN subsections sub ON b.subsection_id = sub.id
+    JOIN sections s ON sub.section_id = s.id
+  `).all();
+
+  const updateStmt = db.prepare('UPDATE books SET storage_path = ? WHERE id = ?');
+  const tx = db.transaction(() => {
+    for (const b of books) {
+      const folderName = path.basename(b.storage_path);
+      const newPath = path.join(baseLibraryPath, b.section_slug, b.subsection_slug, folderName);
+      updateStmt.run(newPath, b.id);
+    }
+  });
+  tx();
+}
+
+function getDatabaseStats() {
+  const sectionsCount = db.prepare('SELECT COUNT(*) as count FROM sections').get().count;
+  const subsectionsCount = db.prepare('SELECT COUNT(*) as count FROM subsections').get().count;
+  const booksCount = db.prepare('SELECT COUNT(*) as count FROM books').get().count;
+  const chaptersCount = db.prepare('SELECT COUNT(*) as count FROM chapters').get().count;
+  return { sectionsCount, subsectionsCount, booksCount, chaptersCount };
+}
 
 function slugify(text) {
   return String(text)
@@ -122,15 +189,6 @@ function findBookByCode(code) {
   return db.prepare('SELECT * FROM books WHERE code = ?').get(code);
 }
 
-const insertBookStmt = db.prepare(`
-  INSERT INTO books (subsection_id, code, title, slug, version, publication_date, author, description, cover_image, storage_path, total_chapters)
-  VALUES (@subsection_id, @code, @title, @slug, @version, @publication_date, @author, @description, @cover_image, @storage_path, @total_chapters)
-`);
-
-const insertChapterStmt = db.prepare(`
-  INSERT INTO chapters (book_id, title, order_index, file_name, relative_path, word_count)
-  VALUES (@book_id, @title, @order_index, @file_name, @relative_path, @word_count)
-`);
 
 function createBookTransaction(bookData, chaptersData) {
   const runTransaction = db.transaction(() => {
@@ -365,6 +423,7 @@ function searchLibrary(query) {
 
 module.exports = {
   db,
+  DB_PATH,
   slugify,
   getOrCreateSection,
   getOrCreateSubsection,
@@ -375,5 +434,11 @@ module.exports = {
   getBookById,
   getChapterContent,
   deleteBook,
-  searchLibrary
+  searchLibrary,
+  backupDatabase,
+  reopenDatabase,
+  closeDatabase,
+  remapStoragePaths,
+  getDatabaseStats
 };
+
